@@ -9,6 +9,7 @@ import { Transactions } from './pages/Transactions'
 import { Budgets } from './pages/Budgets'
 import { Accounts } from './pages/Accounts'
 import { Categories } from './pages/Categories'
+import { Notes } from './pages/Notes'
 import { SettingsPage } from './pages/Settings'
 
 export function App() {
@@ -44,6 +45,7 @@ export function App() {
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/accounts" element={<Accounts />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/notes" element={<Notes />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

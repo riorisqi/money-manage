@@ -39,6 +39,16 @@ export interface Budget {
   amount: number
 }
 
+export interface Note {
+  id: string
+  title: string
+  content: string
+  color: string
+  pinned: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Settings {
   currency: string
   locale: string
@@ -83,5 +93,6 @@ export interface Backup {
   categories: Category[]
   transactions: Transaction[]
   budgets: Budget[]
+  notes: Note[]
   settings: Settings
 }

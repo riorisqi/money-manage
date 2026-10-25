@@ -5,6 +5,7 @@ import type {
   Bootstrap,
   Budget,
   Category,
+  Note,
   Settings,
   Stats,
   Transaction,
@@ -13,6 +14,7 @@ import type {
 export type TxInput = Omit<Transaction, 'id' | 'createdAt'>
 export type AccountInput = Omit<Account, 'id' | 'createdAt' | 'balance'>
 export type CategoryInput = Omit<Category, 'id'>
+export type NoteInput = Pick<Note, 'title' | 'content' | 'color' | 'pinned'>
 
 export interface TxFilters {
   from?: string
@@ -90,6 +92,17 @@ export const useSaveCategory = () =>
   )
 
 export const useDeleteCategory = () => useInvalidating((id: string) => send<void>('DELETE', `/categories/${id}`))
+
+export function useNotes() {
+  return useQuery({ queryKey: ['notes'], queryFn: () => request<Note[]>('/notes') })
+}
+
+export const useSaveNote = () =>
+  useInvalidating(({ id, ...data }: NoteInput & { id?: string }) =>
+    id ? send<Note>('PUT', `/notes/${id}`, data) : send<Note>('POST', '/notes', data),
+  )
+
+export const useDeleteNote = () => useInvalidating((id: string) => send<void>('DELETE', `/notes/${id}`))
 
 export const useSaveBudget = () =>
   useInvalidating((data: Omit<Budget, 'id'>) => send<Budget>('PUT', '/budgets', data))

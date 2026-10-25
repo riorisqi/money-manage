@@ -7,6 +7,7 @@ import {
   ListOrdered,
   Monitor,
   Moon,
+  NotebookPen,
   PiggyBank,
   Plus,
   Settings,
@@ -27,6 +28,7 @@ const nav = [
   { to: '/budgets', label: 'Budgets', icon: PiggyBank },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/categories', label: 'Categories', icon: Shapes },
+  { to: '/notes', label: 'Notes', icon: NotebookPen },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -200,6 +202,15 @@ export function Layout({ children }: { children: (location: Location) => ReactNo
           >
             <Command className="size-4" />
           </button>
+          <NavLink
+            to="/notes"
+            className={({ isActive }) =>
+              cn('grid size-10 place-items-center rounded-xl border border-line bg-subtle', isActive ? 'text-violet-500' : 'text-muted')
+            }
+            aria-label="Notes"
+          >
+            <NotebookPen className="size-4" />
+          </NavLink>
           <NavLink
             to="/settings"
             className="grid size-10 place-items-center rounded-xl border border-line bg-subtle text-muted"

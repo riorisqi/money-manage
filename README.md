@@ -10,6 +10,7 @@ A fast, good-looking personal finance tracker for recording income, expenses and
 - **Budgets**: monthly limits per category, with a daily allowance and over/near-limit warnings
 - **Accounts**: cash, bank, e-wallet, credit, savings and investment, with live balances, net worth and debts
 - **Categories**: custom names, colors and icons
+- **Notes**: pinned, color-coded notes with search and tickable checklists (`- [ ] item`)
 - **Settings**: currency and number format, JSON backup and restore, reset
 - **UX**: light, dark and system themes with a circular reveal transition, command palette (`Ctrl+K`), quick add (`N`), confetti on income, spring animations throughout, and a mobile layout with a bottom nav
 
@@ -25,7 +26,7 @@ docker compose up -d --build
 
 Open http://localhost:3000.
 
-The container uses `restart: unless-stopped`, so it starts automatically whenever Docker Desktop starts. To launch Docker Desktop at login, enable **Settings → General → Start Docker Desktop when you sign in to your computer**.
+The container uses `restart: unless-stopped`, so it starts automatically whenever Docker Desktop starts. To launch Docker Desktop at login, enable **Settings â†’ General â†’ Start Docker Desktop when you sign in to your computer**.
 
 Data is stored in the `money-data` Docker volume and survives rebuilds and updates.
 

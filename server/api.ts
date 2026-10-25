@@ -9,6 +9,7 @@ import type {
   Budget,
   Category,
   CategoryTotal,
+  Note,
   SeriesPoint,
   Settings,
   Stats,
@@ -54,6 +55,15 @@ const budgetSchema = z.object({
   amount: money.positive().max(1e13),
 })
 
+const noteSchema = z
+  .object({
+    title: z.string().trim().max(120).default(''),
+    content: z.string().max(20000).default(''),
+    color: color,
+    pinned: z.boolean().default(false),
+  })
+  .refine((n) => n.title || n.content.trim(), { message: 'Note is empty' })
+
 const settingsSchema = z.object({
   currency: z.string().length(3).toUpperCase(),
   locale: z.string().min(2).max(20),
@@ -77,6 +87,19 @@ const backupSchema = z.object({
     }),
   ),
   budgets: z.array(budgetSchema.extend({ id: z.string() })),
+  notes: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        content: z.string(),
+        color,
+        pinned: z.boolean(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+      }),
+    )
+    .default([]),
   settings: settingsSchema,
 })
 
@@ -106,6 +129,19 @@ const accountsSql = `
 
 function listAccounts() {
   return all<Account>(`${accountsSql} ORDER BY a.createdAt, a.name`)
+}
+
+type NoteRow = Omit<Note, 'pinned'> & { pinned: number }
+
+const toNote = (row: NoteRow): Note => ({ ...row, pinned: !!row.pinned })
+
+function listNotes() {
+  return all<NoteRow>('SELECT * FROM notes ORDER BY pinned DESC, updatedAt DESC').map(toNote)
+}
+
+function getNote(id: string) {
+  const row = get<NoteRow>('SELECT * FROM notes WHERE id = :id', { id })
+  return row ? toNote(row) : undefined
 }
 
 function getSettings(): Settings {
@@ -328,6 +364,38 @@ api.delete('/transactions/:id', (c) => {
   return c.body(null, 204)
 })
 
+api.get('/notes', (c) => c.json(listNotes()))
+
+api.post('/notes', async (c) => {
+  const body = await parse(c, noteSchema)
+  const id = uid()
+  const now = new Date().toISOString()
+  run(
+    `INSERT INTO notes (id, title, content, color, pinned, createdAt, updatedAt)
+     VALUES (:id, :title, :content, :color, :pinned, :now, :now)`,
+    { id, ...body, pinned: body.pinned ? 1 : 0, now },
+  )
+  return c.json(getNote(id), 201)
+})
+
+api.put('/notes/:id', async (c) => {
+  const id = c.req.param('id')
+  const body = await parse(c, noteSchema)
+  const res = run(
+    `UPDATE notes SET title = :title, content = :content, color = :color, pinned = :pinned, updatedAt = :now
+     WHERE id = :id`,
+    { id, ...body, pinned: body.pinned ? 1 : 0, now: new Date().toISOString() },
+  )
+  if (!res.changes) notFound('Note')
+  return c.json(getNote(id))
+})
+
+api.delete('/notes/:id', (c) => {
+  const res = run('DELETE FROM notes WHERE id = :id', { id: c.req.param('id') })
+  if (!res.changes) notFound('Note')
+  return c.body(null, 204)
+})
+
 api.put('/budgets', async (c) => {
   const body = await parse(c, budgetSchema)
   const cat = get<Category>('SELECT * FROM categories WHERE id = :id', { id: body.categoryId })
@@ -415,6 +483,7 @@ api.get('/backup', (c) => {
     categories: all('SELECT * FROM categories'),
     transactions: all('SELECT * FROM transactions'),
     budgets: all('SELECT * FROM budgets'),
+    notes: listNotes(),
     settings: getSettings(),
   }
   c.header('Content-Disposition', `attachment; filename="money-backup-${backup.exportedAt.slice(0, 10)}.json"`)
@@ -424,6 +493,7 @@ api.get('/backup', (c) => {
 api.post('/backup', async (c) => {
   const data = await parse(c, backupSchema)
   transaction(() => {
+    run('DELETE FROM notes')
     run('DELETE FROM transactions')
     run('DELETE FROM budgets')
     run('DELETE FROM categories')
@@ -448,6 +518,13 @@ api.post('/backup', async (c) => {
     for (const b of data.budgets) {
       run('INSERT INTO budgets (id, categoryId, amount) VALUES (:id, :categoryId, :amount)', b)
     }
+    for (const n of data.notes) {
+      run(
+        `INSERT INTO notes (id, title, content, color, pinned, createdAt, updatedAt)
+         VALUES (:id, :title, :content, :color, :pinned, :createdAt, :updatedAt)`,
+        { ...n, pinned: n.pinned ? 1 : 0 },
+      )
+    }
     for (const [key, value] of Object.entries(data.settings)) {
       run('INSERT INTO settings (key, value) VALUES (:key, :value) ON CONFLICT(key) DO UPDATE SET value = excluded.value', {
         key,
@@ -463,6 +540,7 @@ api.delete('/data', (c) => {
   transaction(() => {
     run('DELETE FROM transactions')
     if (!keepSetup) {
+      run('DELETE FROM notes')
       run('DELETE FROM budgets')
       run('DELETE FROM categories')
       run('DELETE FROM accounts')
