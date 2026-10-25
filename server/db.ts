@@ -62,6 +62,31 @@ db.exec(`
     updatedAt TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS trades (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    lots REAL NOT NULL CHECK (lots > 0),
+    price REAL NOT NULL CHECK (price > 0),
+    fee REAL NOT NULL DEFAULT 0,
+    accountId TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+    note TEXT NOT NULL DEFAULT '',
+    date TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
+
+  CREATE TABLE IF NOT EXISTS quotes (
+    symbol TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL,
+    previousClose REAL NOT NULL,
+    currency TEXT NOT NULL,
+    history TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

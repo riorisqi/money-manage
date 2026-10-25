@@ -49,6 +49,67 @@ export interface Note {
   updatedAt: string
 }
 
+export const LOT_SIZE = 100
+
+export type TradeSide = 'buy' | 'sell'
+
+export interface Trade {
+  id: string
+  symbol: string
+  side: TradeSide
+  lots: number
+  price: number
+  fee: number
+  accountId: string | null
+  note: string
+  date: string
+  createdAt: string
+}
+
+export interface Quote {
+  symbol: string
+  name: string
+  price: number
+  previousClose: number
+  currency: string
+  history: number[]
+  updatedAt: string
+  stale: boolean
+}
+
+export interface Holding {
+  symbol: string
+  name: string
+  lots: number
+  avgPrice: number
+  cost: number
+  price: number
+  previousClose: number
+  marketValue: number
+  unrealized: number
+  unrealizedPct: number
+  dayChange: number
+  dayChangePct: number
+  realized: number
+  history: number[]
+  updatedAt: string | null
+  stale: boolean
+}
+
+export interface Portfolio {
+  holdings: Holding[]
+  totals: {
+    marketValue: number
+    cost: number
+    unrealized: number
+    unrealizedPct: number
+    dayChange: number
+    dayChangePct: number
+    realized: number
+  }
+  updatedAt: string | null
+}
+
 export interface Settings {
   currency: string
   locale: string
@@ -94,5 +155,6 @@ export interface Backup {
   transactions: Transaction[]
   budgets: Budget[]
   notes: Note[]
+  trades: Trade[]
   settings: Settings
 }

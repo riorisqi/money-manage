@@ -2,6 +2,7 @@ import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import { NavLink, useLocation, type Location } from 'react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import {
+  CandlestickChart,
   Command,
   LayoutDashboard,
   ListOrdered,
@@ -27,6 +28,7 @@ const nav = [
   { to: '/transactions', label: 'Transactions', icon: ListOrdered },
   { to: '/budgets', label: 'Budgets', icon: PiggyBank },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
+  { to: '/stocks', label: 'Stocks', icon: CandlestickChart },
   { to: '/categories', label: 'Categories', icon: Shapes },
   { to: '/notes', label: 'Notes', icon: NotebookPen },
   { to: '/settings', label: 'Settings', icon: Settings },
@@ -194,7 +196,7 @@ export function Layout({ children }: { children: (location: Location) => ReactNo
 
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line bg-bg/70 px-4 backdrop-blur-xl lg:hidden">
         <Logo />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setPaletteOpen(true)}
             className="grid size-10 cursor-pointer place-items-center rounded-xl border border-line bg-subtle text-muted"
@@ -202,6 +204,15 @@ export function Layout({ children }: { children: (location: Location) => ReactNo
           >
             <Command className="size-4" />
           </button>
+          <NavLink
+            to="/stocks"
+            className={({ isActive }) =>
+              cn('grid size-10 place-items-center rounded-xl border border-line bg-subtle', isActive ? 'text-violet-500' : 'text-muted')
+            }
+            aria-label="Stocks"
+          >
+            <CandlestickChart className="size-4" />
+          </NavLink>
           <NavLink
             to="/notes"
             className={({ isActive }) =>

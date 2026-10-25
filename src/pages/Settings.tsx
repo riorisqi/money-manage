@@ -90,7 +90,7 @@ export function SettingsPage() {
   return (
     <div>
       <PageHeader title="Settings" subtitle="Make it yours." />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader title="Appearance" subtitle="Theme switches with a little flourish" action={<Palette className="size-4 text-muted" />} />
           <div className="grid grid-cols-3 gap-3">

@@ -58,7 +58,7 @@ export function Budgets() {
     <div>
       <PageHeader title="Budgets" subtitle="Set monthly limits per category and watch them fill up." actions={<PeriodPicker />} />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="flex flex-col items-center justify-center text-center">
           <div className="relative size-44">
             <svg viewBox="0 0 120 120" className="size-full -rotate-90">

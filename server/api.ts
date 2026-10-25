@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { all, get, run, seed, transaction, uid } from './db'
+import { buildPortfolio, computePositions, getQuote, listTrades, UnknownSymbolError } from './stocks'
 import type {
   Account,
   Backup,
@@ -13,8 +14,10 @@ import type {
   SeriesPoint,
   Settings,
   Stats,
+  Trade,
   Transaction,
 } from '../shared/types'
+import { LOT_SIZE } from '../shared/types'
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/)
@@ -64,6 +67,23 @@ const noteSchema = z
   })
   .refine((n) => n.title || n.content.trim(), { message: 'Note is empty' })
 
+const symbolSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z0-9]{2,8}$/, 'Use an IDX ticker like BBCA')
+
+const tradeSchema = z.object({
+  symbol: symbolSchema,
+  side: z.enum(['buy', 'sell']),
+  lots: z.number().int('Lots must be a whole number').positive().max(1e9),
+  price: money.positive().max(1e9),
+  fee: money.min(0).max(1e12).default(0),
+  accountId: z.string().nullish(),
+  note: z.string().max(500).default(''),
+  date: dateStr,
+})
+
 const settingsSchema = z.object({
   currency: z.string().length(3).toUpperCase(),
   locale: z.string().min(2).max(20),
@@ -100,6 +120,22 @@ const backupSchema = z.object({
       }),
     )
     .default([]),
+  trades: z
+    .array(
+      z.object({
+        id: z.string(),
+        symbol: z.string(),
+        side: z.enum(['buy', 'sell']),
+        lots: money.positive(),
+        price: money.positive(),
+        fee: money.min(0),
+        accountId: z.string().nullable(),
+        note: z.string(),
+        date: dateStr,
+        createdAt: z.string(),
+      }),
+    )
+    .default([]),
   settings: settingsSchema,
 })
 
@@ -123,7 +159,10 @@ const accountsSql = `
     + COALESCE((SELECT SUM(CASE t.type WHEN 'income' THEN t.amount ELSE -t.amount END)
                 FROM transactions t WHERE t.accountId = a.id), 0)
     + COALESCE((SELECT SUM(t.amount) FROM transactions t
-                WHERE t.type = 'transfer' AND t.toAccountId = a.id), 0) AS balance
+                WHERE t.type = 'transfer' AND t.toAccountId = a.id), 0)
+    + COALESCE((SELECT SUM(CASE s.side WHEN 'sell' THEN s.lots * ${LOT_SIZE} * s.price - s.fee
+                                      ELSE -(s.lots * ${LOT_SIZE} * s.price + s.fee) END)
+                FROM trades s WHERE s.accountId = a.id), 0) AS balance
   FROM accounts a
 `
 
@@ -364,6 +403,53 @@ api.delete('/transactions/:id', (c) => {
   return c.body(null, 204)
 })
 
+api.get('/portfolio', async (c) => c.json(await buildPortfolio(c.req.query('refresh') === '1')))
+
+api.get('/stocks/:symbol', async (c) => {
+  const symbol = symbolSchema.safeParse(c.req.param('symbol'))
+  if (!symbol.success) throw new HTTPException(400, { message: symbol.error.issues[0].message })
+  try {
+    const quote = await getQuote(symbol.data)
+    if (!quote) throw new HTTPException(503, { message: 'Price service unavailable' })
+    return c.json(quote)
+  } catch (err) {
+    if (err instanceof UnknownSymbolError) notFound(`Ticker ${symbol.data}`)
+    throw err
+  }
+})
+
+api.get('/trades', (c) => c.json(listTrades(c.req.query('symbol')?.toUpperCase())))
+
+api.post('/trades', async (c) => {
+  const body = await parse(c, tradeSchema)
+  if (body.accountId) assertAccount(body.accountId)
+  if (body.side === 'sell') {
+    const held = computePositions(listTrades(body.symbol)).get(body.symbol)?.shares ?? 0
+    if (body.lots * LOT_SIZE > held + 1e-9) {
+      throw new HTTPException(400, { message: `You only hold ${held / LOT_SIZE} lot(s) of ${body.symbol}` })
+    }
+  } else {
+    try {
+      await getQuote(body.symbol)
+    } catch (err) {
+      if (err instanceof UnknownSymbolError) throw new HTTPException(400, { message: `Unknown ticker ${body.symbol}` })
+    }
+  }
+  const id = uid()
+  run(
+    `INSERT INTO trades (id, symbol, side, lots, price, fee, accountId, note, date, createdAt)
+     VALUES (:id, :symbol, :side, :lots, :price, :fee, :accountId, :note, :date, :createdAt)`,
+    { id, ...body, accountId: body.accountId ?? null, createdAt: new Date().toISOString() },
+  )
+  return c.json(get<Trade>('SELECT * FROM trades WHERE id = :id', { id }), 201)
+})
+
+api.delete('/trades/:id', (c) => {
+  const res = run('DELETE FROM trades WHERE id = :id', { id: c.req.param('id') })
+  if (!res.changes) notFound('Trade')
+  return c.body(null, 204)
+})
+
 api.get('/notes', (c) => c.json(listNotes()))
 
 api.post('/notes', async (c) => {
@@ -484,6 +570,7 @@ api.get('/backup', (c) => {
     transactions: all('SELECT * FROM transactions'),
     budgets: all('SELECT * FROM budgets'),
     notes: listNotes(),
+    trades: listTrades(),
     settings: getSettings(),
   }
   c.header('Content-Disposition', `attachment; filename="money-backup-${backup.exportedAt.slice(0, 10)}.json"`)
@@ -493,6 +580,7 @@ api.get('/backup', (c) => {
 api.post('/backup', async (c) => {
   const data = await parse(c, backupSchema)
   transaction(() => {
+    run('DELETE FROM trades')
     run('DELETE FROM notes')
     run('DELETE FROM transactions')
     run('DELETE FROM budgets')
@@ -518,6 +606,13 @@ api.post('/backup', async (c) => {
     for (const b of data.budgets) {
       run('INSERT INTO budgets (id, categoryId, amount) VALUES (:id, :categoryId, :amount)', b)
     }
+    for (const t of data.trades) {
+      run(
+        `INSERT INTO trades (id, symbol, side, lots, price, fee, accountId, note, date, createdAt)
+         VALUES (:id, :symbol, :side, :lots, :price, :fee, :accountId, :note, :date, :createdAt)`,
+        t,
+      )
+    }
     for (const n of data.notes) {
       run(
         `INSERT INTO notes (id, title, content, color, pinned, createdAt, updatedAt)
@@ -539,6 +634,7 @@ api.delete('/data', (c) => {
   const keepSetup = c.req.query('scope') === 'transactions'
   transaction(() => {
     run('DELETE FROM transactions')
+    run('DELETE FROM trades')
     if (!keepSetup) {
       run('DELETE FROM notes')
       run('DELETE FROM budgets')

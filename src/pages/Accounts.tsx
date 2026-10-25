@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { motion } from 'motion/react'
-import { ArrowLeftRight, Pencil, Plus } from 'lucide-react'
+import { ArrowLeftRight, CandlestickChart, Pencil, Plus } from 'lucide-react'
 import type { Account, AccountType } from '@shared/types'
-import { useBootstrap, useDeleteAccount, useSaveAccount } from '@/lib/api'
+import { useBootstrap, useDeleteAccount, useSaveAccount, useStocksValue } from '@/lib/api'
 import { useMoney } from '@/lib/format'
 import { Icon } from '@/lib/icons'
 import { useAmountInput } from '@/lib/amount'
@@ -32,8 +33,9 @@ export function Accounts() {
   const { openTx } = useTxForm()
   const [editing, setEditing] = useState<Partial<Account> | null>(null)
   const accounts = data?.accounts ?? []
-  const total = accounts.reduce((s, a) => s + a.balance, 0)
-  const assets = accounts.filter((a) => a.balance > 0).reduce((s, a) => s + a.balance, 0)
+  const stocksValue = useStocksValue()
+  const total = accounts.reduce((s, a) => s + a.balance, 0) + stocksValue
+  const assets = accounts.filter((a) => a.balance > 0).reduce((s, a) => s + a.balance, 0) + stocksValue
   const debts = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + a.balance, 0)
 
   return (
@@ -102,6 +104,26 @@ export function Accounts() {
             </div>
           </motion.button>
         ))}
+        {stocksValue > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }}>
+            <Link
+              to="/stocks"
+              className="group relative flex aspect-[1.7] flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-800 p-5 text-white shadow-xl shadow-emerald-700/30"
+            >
+              <div className="absolute -top-16 -right-10 size-48 rounded-full bg-white/15 blur-2xl transition group-hover:scale-125" />
+              <div className="relative flex items-start justify-between">
+                <div className="grid size-10 place-items-center rounded-xl bg-white/20 backdrop-blur">
+                  <CandlestickChart className="size-5" />
+                </div>
+                <span className="rounded-full bg-black/20 px-2.5 py-1 text-[11px] font-medium backdrop-blur">Portfolio</span>
+              </div>
+              <div className="relative mt-auto">
+                <div className="text-sm text-white/80">Stocks</div>
+                <div className="font-display text-2xl font-bold tracking-tight tabular">{money.format(stocksValue)}</div>
+              </div>
+            </Link>
+          </motion.div>
+        )}
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

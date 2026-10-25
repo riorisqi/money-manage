@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   ArrowDownLeft,
+  CandlestickChart,
   ArrowLeftRight,
   ArrowUpRight,
   CornerDownLeft,
@@ -58,6 +59,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'budgets', group: 'Navigate', label: 'Budgets', icon: <PiggyBank />, keywords: 'limit plan', run: () => navigate('/budgets') },
       { id: 'accounts', group: 'Navigate', label: 'Accounts', icon: <Wallet />, keywords: 'wallet bank', run: () => navigate('/accounts') },
       { id: 'categories', group: 'Navigate', label: 'Categories', icon: <Shapes />, keywords: 'tags', run: () => navigate('/categories') },
+      { id: 'stocks', group: 'Navigate', label: 'Stocks', icon: <CandlestickChart />, keywords: 'saham portfolio idx invest shares', run: () => navigate('/stocks') },
       { id: 'notes', group: 'Navigate', label: 'Notes', icon: <NotebookPen />, keywords: 'memo todo checklist list', run: () => navigate('/notes') },
       { id: 'settings', group: 'Navigate', label: 'Settings', icon: <Settings />, keywords: 'currency backup export', run: () => navigate('/settings') },
     ],

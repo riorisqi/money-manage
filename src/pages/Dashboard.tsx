@@ -15,7 +15,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
-import { useBootstrap, useStats, useTransactions } from '@/lib/api'
+import { useBootstrap, useStats, useStocksValue, useTransactions } from '@/lib/api'
 import { percentChange, useMoney } from '@/lib/format'
 import { usePeriod } from '@/lib/period'
 import { IconBadge } from '@/lib/icons'
@@ -68,7 +68,8 @@ export function Dashboard() {
   const [donutType, setDonutType] = useState<'expense' | 'income'>('expense')
 
   const accounts = boot?.accounts ?? []
-  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0)
+  const stocksValue = useStocksValue()
+  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0) + stocksValue
   const income = stats?.income ?? 0
   const expense = stats?.expense ?? 0
   const savingsRate = income > 0 ? ((income - expense) / income) * 100 : 0
@@ -167,7 +168,7 @@ export function Dashboard() {
     <div>
       <PageHeader title={`${greeting()} 👋`} subtitle={`Here's your money at a glance for ${period.label}.`} actions={<PeriodPicker />} />
 
-      <motion.div variants={stagger} initial="hidden" animate="show" className="grid gap-4 lg:grid-cols-3">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <motion.div
           variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
           className="relative overflow-hidden rounded-3xl bg-brand p-6 text-white shadow-2xl shadow-violet-600/25 lg:col-span-2"
@@ -187,6 +188,7 @@ export function Dashboard() {
               <span className="text-sm font-medium text-white/75">Total balance</span>
               <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium backdrop-blur">
                 {accounts.length} account{accounts.length === 1 ? '' : 's'}
+                {stocksValue > 0 && ' + stocks'}
               </span>
             </div>
             <div className="mt-3 font-display text-4xl font-bold tracking-tight tabular sm:text-5xl">
@@ -217,6 +219,24 @@ export function Dashboard() {
                   <div className="mt-0.5 font-mono text-sm font-semibold tabular">{money.compact(a.balance)}</div>
                 </motion.div>
               ))}
+              {stocksValue > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 + accounts.length * 0.07 }}
+                  className="shrink-0"
+                >
+                  <Link
+                    to="/stocks"
+                    className="block min-w-36 rounded-2xl border border-white/25 bg-white/20 px-3.5 py-3 backdrop-blur-md transition hover:bg-white/30"
+                  >
+                    <div className="flex items-center gap-1 text-xs text-white/80">
+                      <TrendingUp className="size-3" /> Stocks
+                    </div>
+                    <div className="mt-0.5 font-mono text-sm font-semibold tabular">{money.compact(stocksValue)}</div>
+                  </Link>
+                </motion.div>
+              )}
             </div>
           </div>
         </motion.div>

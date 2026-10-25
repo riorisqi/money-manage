@@ -6,14 +6,18 @@ import type {
   Budget,
   Category,
   Note,
+  Portfolio,
+  Quote,
   Settings,
   Stats,
+  Trade,
   Transaction,
 } from '@shared/types'
 
 export type TxInput = Omit<Transaction, 'id' | 'createdAt'>
 export type AccountInput = Omit<Account, 'id' | 'createdAt' | 'balance'>
 export type CategoryInput = Omit<Category, 'id'>
+export type TradeInput = Omit<Trade, 'id' | 'createdAt'>
 export type NoteInput = Pick<Note, 'title' | 'content' | 'color' | 'pinned'>
 
 export interface TxFilters {
@@ -92,6 +96,42 @@ export const useSaveCategory = () =>
   )
 
 export const useDeleteCategory = () => useInvalidating((id: string) => send<void>('DELETE', `/categories/${id}`))
+
+export function usePortfolio(enabled = true) {
+  return useQuery({
+    queryKey: ['portfolio'],
+    queryFn: () => request<Portfolio>('/portfolio'),
+    refetchInterval: 60_000,
+    enabled,
+  })
+}
+
+export function useStocksValue() {
+  const { data: boot } = useBootstrap()
+  const isIdr = boot?.settings.currency === 'IDR'
+  const { data } = usePortfolio(isIdr)
+  return isIdr ? (data?.totals.marketValue ?? 0) : 0
+}
+
+export const refreshPortfolio = () => request<Portfolio>('/portfolio?refresh=1')
+
+export function useQuote(symbol: string) {
+  return useQuery({
+    queryKey: ['quote', symbol],
+    queryFn: () => request<Quote>(`/stocks/${encodeURIComponent(symbol)}`),
+    enabled: /^[A-Z0-9]{2,8}$/.test(symbol),
+    retry: false,
+    staleTime: 60_000,
+  })
+}
+
+export function useTrades() {
+  return useQuery({ queryKey: ['trades'], queryFn: () => request<Trade[]>('/trades') })
+}
+
+export const useSaveTrade = () => useInvalidating((data: TradeInput) => send<Trade>('POST', '/trades', data))
+
+export const useDeleteTrade = () => useInvalidating((id: string) => send<void>('DELETE', `/trades/${id}`))
 
 export function useNotes() {
   return useQuery({ queryKey: ['notes'], queryFn: () => request<Note[]>('/notes') })
