@@ -1,18 +1,21 @@
-import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { createContext, forwardRef, useContext, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { motion } from 'motion/react'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn, palette } from '@/lib/utils'
 import { Icon, iconNames } from '@/lib/icons'
 
+const FieldId = createContext<string | undefined>(undefined)
+
 export function Field({ label, hint, children, className }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+  const id = useId()
   return (
-    <label className={cn('block', className)}>
-      <span className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
-        {label}
+    <div className={className}>
+      <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted">
+        <label htmlFor={id}>{label}</label>
         {hint && <span className="font-normal opacity-80">{hint}</span>}
-      </span>
-      {children}
-    </label>
+      </div>
+      <FieldId.Provider value={id}>{children}</FieldId.Provider>
+    </div>
   )
 }
 
@@ -23,13 +26,15 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   { className, ...props },
   ref,
 ) {
-  return <input ref={ref} className={cn(control, className)} {...props} />
+  const fieldId = useContext(FieldId)
+  return <input ref={ref} id={fieldId} className={cn(control, className)} {...props} />
 })
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  const fieldId = useContext(FieldId)
   return (
     <div className="relative">
-      <select className={cn(control, 'cursor-pointer appearance-none pr-9', className)} {...props}>
+      <select id={fieldId} className={cn(control, 'cursor-pointer appearance-none pr-9', className)} {...props}>
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" />
@@ -111,10 +116,11 @@ export function IconPicker({ value, onChange, color }: { value: string; onChange
             type="button"
             onClick={() => onChange(name)}
             className={cn(
-              'grid aspect-square cursor-pointer place-items-center rounded-lg transition hover:bg-elevated',
-              active ? 'bg-elevated shadow-sm' : 'text-muted',
+              'grid aspect-square cursor-pointer place-items-center rounded-lg transition-transform duration-150 active:scale-90',
+              !active && 'text-muted hover:bg-line hover:text-fg',
             )}
-            style={active ? { color, boxShadow: `inset 0 0 0 1.5px ${color}` } : undefined}
+            style={active ? { color, background: `${color}26`, boxShadow: `inset 0 0 0 1.5px ${color}` } : undefined}
+            aria-pressed={active}
             aria-label={name}
           >
             <Icon name={name} className="size-4" />
