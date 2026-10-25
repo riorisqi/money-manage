@@ -5,7 +5,7 @@ import type { Account, AccountType } from '@shared/types'
 import { useBootstrap, useDeleteAccount, useSaveAccount } from '@/lib/api'
 import { useMoney } from '@/lib/format'
 import { Icon } from '@/lib/icons'
-import { evaluateAmount } from '@/lib/utils'
+import { useAmountInput } from '@/lib/amount'
 import { PageHeader } from '@/components/Layout'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -146,11 +146,11 @@ function AccountForm({ account, onClose, canDelete }: { account: Partial<Account
   const [type, setType] = useState<AccountType>(account.type ?? 'bank')
   const [color, setColor] = useState(account.color ?? '#6366f1')
   const [icon, setIcon] = useState(account.icon ?? 'landmark')
-  const [initial, setInitial] = useState(account.initialBalance ? String(account.initialBalance) : '')
+  const initial = useAmountInput(account.initialBalance)
   const [error, setError] = useState<string | null>(null)
 
   const submit = async () => {
-    const initialBalance = initial.trim() ? evaluateAmount(initial) : 0
+    const initialBalance = initial.text.trim() ? initial.amount : 0
     if (!name.trim()) return setError('Name is required')
     if (initialBalance === null) return setError('Initial balance is not a valid number')
     try {
@@ -182,7 +182,7 @@ function AccountForm({ account, onClose, canDelete }: { account: Partial<Account
             <div className="text-sm font-semibold">{name || 'Account name'}</div>
             <div className="text-xs text-white/70">{typeLabel[type]}</div>
           </div>
-          <div className="ml-auto font-display text-lg font-bold">{money.format(evaluateAmount(initial) ?? 0)}</div>
+          <div className="ml-auto font-display text-lg font-bold">{money.format(initial.amount ?? 0)}</div>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -207,7 +207,7 @@ function AccountForm({ account, onClose, canDelete }: { account: Partial<Account
         </Field>
       </div>
       <Field label="Starting balance" hint="Use a negative value for debt">
-        <Input inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} placeholder="0" />
+        <Input {...initial.inputProps} placeholder="0" />
       </Field>
       <Field label="Color">
         <ColorPicker value={color} onChange={setColor} />

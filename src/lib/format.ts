@@ -45,6 +45,17 @@ export const currencies = [
   'USD', 'EUR', 'GBP', 'IDR', 'JPY', 'SGD', 'MYR', 'AUD', 'CAD', 'CHF', 'CNY', 'HKD', 'INR', 'KRW', 'THB', 'PHP', 'VND', 'BRL', 'MXN', 'AED', 'SAR', 'ZAR', 'NZD', 'SEK', 'NOK', 'TRY',
 ]
 
+export const currencyLocale: Record<string, string> = {
+  USD: 'en-US',
+  GBP: 'en-GB',
+  EUR: 'de-DE',
+  IDR: 'id-ID',
+  JPY: 'ja-JP',
+  MYR: 'ms-MY',
+  BRL: 'pt-BR',
+  CNY: 'zh-CN',
+}
+
 export const locales = [
   { value: 'en-US', label: 'English (US)' },
   { value: 'en-GB', label: 'English (UK)' },

@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Database, Download, FileJson, Keyboard, Monitor, Moon, Palette, Sun, Trash2, Upload } from 'lucide-react'
 import type { Backup } from '@shared/types'
 import { fetchBackup, fetchCsv, useBootstrap, useRestoreBackup, useSaveSettings, useWipeData } from '@/lib/api'
-import { currencies, locales } from '@/lib/format'
+import { currencies, currencyLocale, locales } from '@/lib/format'
 import { useTheme, type ThemePref } from '@/lib/theme'
 import { cn, download } from '@/lib/utils'
 import { PageHeader } from '@/components/Layout'
@@ -114,7 +114,7 @@ export function SettingsPage() {
           <CardHeader title="Currency & format" subtitle={sample ? `Preview: ${sample}` : undefined} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Currency">
-              <Select value={settings.currency} onChange={(e) => update({ currency: e.target.value })}>
+              <Select value={settings.currency} onChange={(e) => update({ currency: e.target.value, locale: currencyLocale[e.target.value] ?? settings.locale })}>
                 {currencies.map((c) => (
                   <option key={c} value={c}>
                     {c}

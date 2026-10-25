@@ -7,7 +7,8 @@ import { useBootstrap, useDeleteBudget, useSaveBudget, useStats } from '@/lib/ap
 import { useMoney } from '@/lib/format'
 import { usePeriod } from '@/lib/period'
 import { IconBadge } from '@/lib/icons'
-import { cn, evaluateAmount } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { useAmountInput } from '@/lib/amount'
 import { PageHeader } from '@/components/Layout'
 import { PeriodPicker } from '@/components/PeriodPicker'
 import { Card, CardHeader, Pill } from '@/components/ui/Card'
@@ -200,13 +201,14 @@ function BudgetModal({
   const toast = useToast()
   const save = useSaveBudget()
   const remove = useDeleteBudget()
-  const [text, setText] = useState('')
+  const limit = useAmountInput(current)
+  const { setAmount } = limit
 
   useEffect(() => {
-    setText(current ? String(current) : '')
-  }, [category, current])
+    setAmount(current ?? null)
+  }, [category, current, setAmount])
 
-  const amount = evaluateAmount(text)
+  const amount = limit.amount
   const suggestions = [spent * 1.1, spent * 1.25, spent * 1.5].filter((n) => n > 0).map((n) => Math.ceil(n / 10) * 10)
 
   const submit = async () => {
@@ -234,7 +236,7 @@ function BudgetModal({
             </div>
           </div>
           <Field label={`Limit (${money.symbol})`}>
-            <Input autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. 500" />
+            <Input autoFocus {...limit.inputProps} placeholder="e.g. 500" />
           </Field>
           {suggestions.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -242,7 +244,7 @@ function BudgetModal({
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setText(String(s))}
+                  onClick={() => setAmount(s)}
                   className="cursor-pointer rounded-full border border-line px-3 py-1 text-xs text-muted transition hover:border-violet-500/50 hover:text-fg"
                 >
                   {money.format(s)}

@@ -6,7 +6,8 @@ import { subDays } from 'date-fns'
 import type { Transaction, TxType } from '@shared/types'
 import { useBootstrap, useDeleteTransaction, useSaveTransaction, type TxInput } from '@/lib/api'
 import { toISODate, useMoney } from '@/lib/format'
-import { cn, evaluateAmount } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { useAmountInput } from '@/lib/amount'
 import { IconBadge } from '@/lib/icons'
 import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
@@ -102,13 +103,12 @@ function TransactionForm({ draft, onDone }: { draft: Draft; onDone: () => void }
   const save = useSaveTransaction()
   const deleteWithUndo = useDeleteWithUndo()
   const submitRef = useRef<HTMLButtonElement>(null)
-  const amountRef = useRef<HTMLInputElement>(null)
 
   const accounts = data?.accounts ?? []
   const categories = data?.categories ?? []
 
   const [type, setType] = useState<TxType>(draft.type ?? 'expense')
-  const [amountText, setAmountText] = useState(draft.amount ? String(draft.amount) : '')
+  const amountInput = useAmountInput(draft.amount)
   const [accountId, setAccountId] = useState(draft.accountId ?? accounts[0]?.id ?? '')
   const [toAccountId, setToAccountId] = useState(draft.toAccountId ?? accounts[1]?.id ?? '')
   const [categoryId, setCategoryId] = useState<string | null>(draft.categoryId ?? null)
@@ -116,8 +116,8 @@ function TransactionForm({ draft, onDone }: { draft: Draft; onDone: () => void }
   const [note, setNote] = useState(draft.note ?? '')
   const [error, setError] = useState<string | null>(null)
 
-  const amount = evaluateAmount(amountText)
-  const isExpression = /[+\-*/x()km]/i.test(amountText.replace(/^-/, ''))
+  const amount = amountInput.amount
+  const isExpression = /[+\-*/x()km]/i.test(amountInput.text.replace(/^-/, ''))
   const visibleCategories = useMemo(() => categories.filter((c) => c.type === type), [categories, type])
 
   useEffect(() => {
@@ -144,9 +144,9 @@ function TransactionForm({ draft, onDone }: { draft: Draft; onDone: () => void }
       if (type === 'income' && !draft.id) celebrate(submitRef.current)
       toast({ message: draft.id ? 'Transaction updated' : `${typeMeta[type].label} of ${money.format(amount)} saved` })
       if (again) {
-        setAmountText('')
+        amountInput.setAmount(null)
         setNote('')
-        amountRef.current?.focus()
+        amountInput.ref.current?.focus()
       } else onDone()
     } catch (e) {
       setError((e as Error).message)
@@ -190,17 +190,14 @@ function TransactionForm({ draft, onDone }: { draft: Draft; onDone: () => void }
         <div className="flex items-center justify-between text-xs text-muted">
           <span>Amount</span>
           <span className="hidden sm:inline">
-            Supports math like <span className="font-mono">25k+3.5k</span>
+            Supports math like <span className="font-mono">25k+500</span>
           </span>
         </div>
         <div className="mt-1 flex items-baseline gap-2">
           <span className={cn('font-display text-2xl font-semibold', typeMeta[type].color)}>{money.symbol}</span>
           <input
-            ref={amountRef}
+            {...amountInput.inputProps}
             autoFocus
-            inputMode="decimal"
-            value={amountText}
-            onChange={(e) => setAmountText(e.target.value)}
             placeholder="0"
             className="w-full min-w-0 bg-transparent font-display text-4xl font-semibold tracking-tight outline-none tabular placeholder:text-muted/40"
           />
