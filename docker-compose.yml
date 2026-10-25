@@ -1,0 +1,15 @@
+name: money-manage
+
+services:
+  app:
+    build: .
+    image: money-manage:latest
+    container_name: money-manage
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - money-data:/data
+
+volumes:
+  money-data:

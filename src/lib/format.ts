@@ -1,0 +1,59 @@
+import { useMemo } from 'react'
+import { format, isToday, isYesterday, parseISO } from 'date-fns'
+import { useBootstrap } from './api'
+
+export function useMoney() {
+  const { data } = useBootstrap()
+  const currency = data?.settings.currency ?? 'USD'
+  const locale = data?.settings.locale ?? 'en-US'
+
+  return useMemo(() => {
+    const full = new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 2 })
+    const compact = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    })
+    const symbol = full.formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency
+    return {
+      currency,
+      locale,
+      symbol,
+      format: (n: number) => full.format(n),
+      compact: (n: number) => (Math.abs(n) >= 100_000 ? compact.format(n) : full.format(n)),
+      axis: (n: number) => compact.format(n),
+    }
+  }, [currency, locale])
+}
+
+export const toISODate = (d: Date) => format(d, 'yyyy-MM-dd')
+
+export function friendlyDate(iso: string) {
+  const d = parseISO(iso)
+  if (isToday(d)) return 'Today'
+  if (isYesterday(d)) return 'Yesterday'
+  return format(d, 'EEE, d MMM yyyy')
+}
+
+export function percentChange(current: number, previous: number) {
+  if (!previous) return current ? 100 : 0
+  return ((current - previous) / Math.abs(previous)) * 100
+}
+
+export const currencies = [
+  'USD', 'EUR', 'GBP', 'IDR', 'JPY', 'SGD', 'MYR', 'AUD', 'CAD', 'CHF', 'CNY', 'HKD', 'INR', 'KRW', 'THB', 'PHP', 'VND', 'BRL', 'MXN', 'AED', 'SAR', 'ZAR', 'NZD', 'SEK', 'NOK', 'TRY',
+]
+
+export const locales = [
+  { value: 'en-US', label: 'English (US)' },
+  { value: 'en-GB', label: 'English (UK)' },
+  { value: 'id-ID', label: 'Bahasa Indonesia' },
+  { value: 'de-DE', label: 'Deutsch' },
+  { value: 'fr-FR', label: 'Français' },
+  { value: 'es-ES', label: 'Español' },
+  { value: 'ja-JP', label: '日本語' },
+  { value: 'ms-MY', label: 'Bahasa Melayu' },
+  { value: 'pt-BR', label: 'Português (BR)' },
+  { value: 'zh-CN', label: '中文' },
+]
