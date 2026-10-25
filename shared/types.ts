@@ -110,6 +110,26 @@ export interface Portfolio {
   updatedAt: string | null
 }
 
+export interface MarketQuote {
+  symbol: string
+  label: string
+  name: string
+  price: number
+  previousClose: number
+  change: number
+  changePct: number
+  series: number[]
+  marketTime: string
+  open: boolean
+  updatedAt: string
+  stale: boolean
+}
+
+export interface Market {
+  ihsg: MarketQuote | null
+  rates: MarketQuote[]
+}
+
 export interface Settings {
   currency: string
   locale: string

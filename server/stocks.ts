@@ -8,32 +8,36 @@ export class UnknownSymbolError extends Error {}
 
 const jakartaDate = (unix: number, offset: number) => new Date((unix + offset) * 1000).toISOString().slice(0, 10)
 
-async function fetchQuote(symbol: string): Promise<Quote> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}.JK?range=1mo&interval=1d`
+export interface ChartMeta {
+  regularMarketPrice: number
+  regularMarketTime: number
+  gmtoffset: number
+  currency: string
+  longName?: string
+  shortName?: string
+  chartPreviousClose?: number
+  currentTradingPeriod?: { regular?: { start: number; end: number } }
+}
+
+export interface ChartResult {
+  meta: ChartMeta
+  timestamp?: number[]
+  indicators: { quote: { close: (number | null)[] }[] }
+}
+
+export async function fetchChart(yahooSymbol: string, range: string, interval: string): Promise<ChartResult> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=${range}&interval=${interval}`
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) })
-  if (res.status === 404) throw new UnknownSymbolError(symbol)
+  if (res.status === 404) throw new UnknownSymbolError(yahooSymbol)
   if (!res.ok) throw new Error(`Quote request failed (${res.status})`)
-
-  const json = (await res.json()) as {
-    chart: {
-      result: {
-        meta: {
-          regularMarketPrice: number
-          regularMarketTime: number
-          gmtoffset: number
-          currency: string
-          longName?: string
-          shortName?: string
-          chartPreviousClose?: number
-        }
-        timestamp?: number[]
-        indicators: { quote: { close: (number | null)[] }[] }
-      }[] | null
-    }
-  }
+  const json = (await res.json()) as { chart: { result: ChartResult[] | null } }
   const result = json.chart.result?.[0]
-  if (!result) throw new UnknownSymbolError(symbol)
+  if (!result) throw new UnknownSymbolError(yahooSymbol)
+  return result
+}
 
+async function fetchQuote(symbol: string): Promise<Quote> {
+  const result = await fetchChart(`${symbol}.JK`, '1mo', '1d')
   const { meta } = result
   const timestamps = result.timestamp ?? []
   const closes = result.indicators.quote[0]?.close ?? []

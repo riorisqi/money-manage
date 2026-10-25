@@ -5,6 +5,7 @@ import type {
   Bootstrap,
   Budget,
   Category,
+  Market,
   Note,
   Portfolio,
   Quote,
@@ -103,6 +104,16 @@ export function usePortfolio(enabled = true) {
     queryFn: () => request<Portfolio>('/portfolio'),
     refetchInterval: 60_000,
     enabled,
+  })
+}
+
+export function useMarket() {
+  return useQuery({
+    queryKey: ['market'],
+    queryFn: () => request<Market>('/market'),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
   })
 }
 

@@ -16,41 +16,10 @@ import { EmptyState, Skeleton } from '@/components/ui/Misc'
 import { useConfirm } from '@/components/ui/Confirm'
 import { useToast } from '@/components/ui/Toast'
 import { TradeModal } from '@/components/TradeForm'
+import { Sparkline } from '@/components/charts/Sparkline'
+import { MarketStrip } from '@/components/MarketStrip'
 
 const tone = (n: number) => (n > 0 ? 'text-emerald-500' : n < 0 ? 'text-rose-500' : 'text-muted')
-
-export function Sparkline({ data, className }: { data: number[]; className?: string }) {
-  if (data.length < 2) return <div className={className} />
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const span = max - min || 1
-  const points = data.map((v, i) => `${(i / (data.length - 1)) * 100},${30 - ((v - min) / span) * 28 - 1}`).join(' ')
-  const up = data[data.length - 1] >= data[0]
-  const color = up ? '#10b981' : '#f43f5e'
-  const id = `spark-${up ? 'up' : 'down'}`
-  return (
-    <svg viewBox="0 0 100 30" preserveAspectRatio="none" className={className}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity="0.3" />
-          <stop offset="1" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={`0,30 ${points} 100,30`} fill={`url(#${id})`} />
-      <motion.polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.6"
-        vectorEffect="non-scaling-stroke"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 1, ease: 'easeOut' }}
-      />
-    </svg>
-  )
-}
 
 function TickerBadge({ symbol, color }: { symbol: string; color: string }) {
   return (
@@ -121,6 +90,8 @@ export function Stocks() {
           </>
         }
       />
+
+      <MarketStrip className="mb-4" />
 
       {anyStale && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">

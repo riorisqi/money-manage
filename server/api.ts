@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { all, get, run, seed, transaction, uid } from './db'
+import { getMarket } from './market'
 import { buildPortfolio, computePositions, getQuote, listTrades, UnknownSymbolError } from './stocks'
 import type {
   Account,
@@ -402,6 +403,8 @@ api.delete('/transactions/:id', (c) => {
   if (!res.changes) notFound('Transaction')
   return c.body(null, 204)
 })
+
+api.get('/market', async (c) => c.json(await getMarket(c.req.query('refresh') === '1')))
 
 api.get('/portfolio', async (c) => c.json(await buildPortfolio(c.req.query('refresh') === '1')))
 

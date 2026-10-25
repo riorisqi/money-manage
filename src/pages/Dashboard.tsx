@@ -22,6 +22,7 @@ import { IconBadge } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/Layout'
 import { PeriodPicker } from '@/components/PeriodPicker'
+import { MarketStrip } from '@/components/MarketStrip'
 import { Card, CardHeader, Pill } from '@/components/ui/Card'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { Segmented } from '@/components/ui/Form'
@@ -167,6 +168,8 @@ export function Dashboard() {
   return (
     <div>
       <PageHeader title={`${greeting()} 👋`} subtitle={`Here's your money at a glance for ${period.label}.`} actions={<PeriodPicker />} />
+
+      <MarketStrip compact className="mb-4" />
 
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <motion.div
