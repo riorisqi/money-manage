@@ -15,7 +15,7 @@ A fast, good-looking personal finance tracker for recording income, expenses and
 
 ## Tech stack
 
-React 19, TypeScript, Tailwind CSS v4, Motion, Recharts and TanStack Query on the frontend. The API uses Hono on Node 24 with the built-in `node:sqlite`, so there are no native dependencies. Vite builds the frontend and esbuild bundles the server into a single file.
+React 19, TypeScript, Tailwind CSS v4, Motion, Recharts and TanStack Query on the frontend. The API uses Hono running on Bun with the built-in `bun:sqlite`, so there are no native dependencies. Vite builds the frontend and `bun build` bundles the server into a single file.
 
 ## Run with Docker (recommended)
 
@@ -43,11 +43,11 @@ docker compose up -d --build
 
 ## Local development
 
-Requires Node.js 24+.
+Requires [Bun](https://bun.sh) 1.4+.
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 - Web: http://localhost:5173 (proxies `/api` to the API)
@@ -59,7 +59,7 @@ The SQLite database is created at `./data/money.db`.
 
 | Script              | Description                                 |
 | ------------------- | ------------------------------------------- |
-| `npm run dev`       | API + Vite dev server with hot reload       |
-| `npm run build`     | Typecheck, build client and bundle server   |
-| `npm start`         | Run the production build                    |
-| `npm run typecheck` | TypeScript check only                       |
+| `bun run dev`       | API + Vite dev server with hot reload       |
+| `bun run build`     | Typecheck, build client and bundle server   |
+| `bun run start`     | Run the production build                    |
+| `bun run typecheck` | TypeScript check only                       |

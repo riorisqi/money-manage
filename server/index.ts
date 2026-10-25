@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
-import { serve } from '@hono/node-server'
-import { serveStatic } from '@hono/node-server/serve-static'
+import { serveStatic } from 'hono/bun'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { compress } from 'hono/compress'
@@ -34,12 +33,11 @@ app.onError((err, c) => {
 })
 
 const port = Number(process.env.PORT ?? 3000)
-const server = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
-  console.log(`Money Manage running on http://localhost:${info.port}`)
-})
+const server = Bun.serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
+console.log(`Money Manage running on http://localhost:${server.port}`)
 
 const shutdown = () => {
-  server.close()
+  server.stop()
   db.close()
   process.exit(0)
 }

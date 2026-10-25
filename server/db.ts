@@ -1,4 +1,4 @@
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { Database } from 'bun:sqlite'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 const dataDir = process.env.DATA_DIR ?? join(process.cwd(), 'data')
 mkdirSync(dataDir, { recursive: true })
 
-export const db = new DatabaseSync(join(dataDir, 'money.db'))
+export const db = new Database(join(dataDir, 'money.db'), { create: true, strict: true })
 
 db.exec(`
   PRAGMA journal_mode = WAL;
@@ -58,30 +58,22 @@ db.exec(`
   );
 `)
 
-type Params = Record<string, SQLInputValue>
+type Params = Record<string, string | number | bigint | boolean | null>
 
 export function all<T>(sql: string, params: Params = {}): T[] {
-  return db.prepare(sql).all(params) as unknown as T[]
+  return db.query(sql).all(params) as T[]
 }
 
 export function get<T>(sql: string, params: Params = {}): T | undefined {
-  return db.prepare(sql).get(params) as unknown as T | undefined
+  return (db.query(sql).get(params) as T | null) ?? undefined
 }
 
 export function run(sql: string, params: Params = {}) {
-  return db.prepare(sql).run(params)
+  return db.query(sql).run(params)
 }
 
 export function transaction<T>(fn: () => T): T {
-  db.exec('BEGIN')
-  try {
-    const result = fn()
-    db.exec('COMMIT')
-    return result
-  } catch (err) {
-    db.exec('ROLLBACK')
-    throw err
-  }
+  return db.transaction(fn)()
 }
 
 export const uid = () => randomUUID()
