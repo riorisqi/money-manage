@@ -92,7 +92,7 @@ export function LockScreen({ mode }: { mode: 'setup' | 'login' }) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder={isSetup ? 'New password or PIN' : 'Password or PIN'}
               autoComplete={isSetup ? 'new-password' : 'current-password'}
-              className="pr-11 text-center tracking-widest"
+              className="px-11 text-center tracking-widest"
               aria-label="Password"
             />
             <button
