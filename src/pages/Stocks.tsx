@@ -17,6 +17,7 @@ import { useConfirm } from '@/components/ui/Confirm'
 import { useToast } from '@/components/ui/Toast'
 import { TradeModal } from '@/components/TradeForm'
 import { PositionModal, replacementWarning } from '@/components/PositionForm'
+import { Menu } from '@/components/ui/Menu'
 import { Sparkline } from '@/components/charts/Sparkline'
 import { MarketStrip } from '@/components/MarketStrip'
 
@@ -202,13 +203,15 @@ export function Stocks() {
             <CardHeader title="Holdings" subtitle={`${holdings.length} open position${holdings.length === 1 ? '' : 's'} · 1 lot = ${LOT_SIZE} shares`} />
             {holdings.length ? (
               <div className="-mx-2">
-                <div className="hidden grid-cols-[minmax(0,2fr)_1fr_1.2fr_1.2fr_auto] gap-4 xl:grid-cols-[minmax(0,2fr)_1fr_1fr_1.2fr_1.2fr_auto] px-2 pb-2 text-[11px] font-medium tracking-wide text-muted uppercase md:grid">
+                <div className={cn('hidden gap-4 px-2 pb-2 text-[11px] font-medium tracking-wide text-muted uppercase md:grid', holdingCols)}>
                   <span>Stock</span>
                   <span className="hidden xl:block">Trend 1M</span>
                   <span className="text-right">Price</span>
                   <span className="text-right">Value</span>
+                  <span className="hidden text-right xl:block">Today</span>
                   <span className="text-right">P/L</span>
-                  <span className="w-44" />
+                  <span className="hidden text-right xl:block">Weight</span>
+                  <span />
                 </div>
                 {holdings.map((h, i) => (
                   <HoldingRow
@@ -217,6 +220,7 @@ export function Stocks() {
                     color={colors.get(h.symbol)!}
                     index={i}
                     active={filter === h.symbol}
+                    weight={totals?.marketValue ? (h.marketValue / totals.marketValue) * 100 : 0}
                     onSelect={() => setFilter((f) => (f === h.symbol ? null : h.symbol))}
                     onTrade={(side) => setTrade({ side, symbol: h.symbol })}
                     onEdit={() => setEditingPosition(h)}
@@ -324,11 +328,15 @@ function Allocation({ holdings, colors, total }: { holdings: Holding[]; colors: 
   )
 }
 
+const holdingCols =
+  'md:grid-cols-[minmax(0,2fr)_1fr_1.2fr_1.2fr_2rem] xl:grid-cols-[minmax(0,1.8fr)_1fr_0.9fr_1.1fr_1fr_1.1fr_0.9fr_2rem]'
+
 function HoldingRow({
   holding: h,
   color,
   index,
   active,
+  weight,
   onSelect,
   onTrade,
   onEdit,
@@ -338,6 +346,7 @@ function HoldingRow({
   color: string
   index: number
   active: boolean
+  weight: number
   onSelect: () => void
   onTrade: (side: TradeSide) => void
   onEdit: () => void
@@ -351,7 +360,8 @@ function HoldingRow({
       transition={{ delay: index * 0.05 }}
       onClick={onSelect}
       className={cn(
-        'group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-xl px-2 py-3 transition hover:bg-subtle md:grid-cols-[minmax(0,2fr)_1fr_1.2fr_1.2fr_auto] xl:grid-cols-[minmax(0,2fr)_1fr_1fr_1.2fr_1.2fr_auto]',
+        'group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto_2rem] items-center gap-x-4 rounded-xl px-2 py-3 transition hover:bg-subtle',
+        holdingCols,
         active && 'bg-subtle ring-1 ring-line',
       )}
     >
@@ -371,10 +381,12 @@ function HoldingRow({
       </div>
 
       <div className="text-right md:hidden">
-        <div className="font-mono text-sm font-semibold tabular">{idr.compact(h.marketValue)}</div>
-        <div className={cn('font-mono text-xs tabular', tone(h.unrealized))}>
-          {idr.signed(h.unrealized)} ({idr.pct(h.unrealizedPct)})
+        <div className="font-mono text-sm font-semibold whitespace-nowrap tabular">{idr.short(h.marketValue)}</div>
+        <div className={cn('font-mono text-xs whitespace-nowrap tabular', tone(h.unrealized))}>
+          {h.unrealized > 0 ? '+' : ''}
+          {idr.short(h.unrealized)}
         </div>
+        <div className={cn('font-mono text-[11px] tabular', tone(h.unrealized))}>{idr.pct(h.unrealizedPct)}</div>
       </div>
 
       <Sparkline data={h.history} className="hidden h-8 w-full xl:block" />
@@ -389,6 +401,11 @@ function HoldingRow({
         <div className="text-[11px] text-muted tabular">cost {idr.compact(h.cost)}</div>
       </div>
 
+      <div className="hidden text-right xl:block">
+        <div className={cn('font-mono text-sm tabular', tone(h.dayChange))}>{idr.signed(h.dayChange)}</div>
+        <div className="text-[11px] text-muted">since yesterday</div>
+      </div>
+
       <div className="hidden text-right md:block">
         <div className={cn('font-mono text-sm font-semibold tabular', tone(h.unrealized))}>{idr.signed(h.unrealized)}</div>
         <Pill className={cn('mt-0.5', h.unrealized >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500')}>
@@ -396,55 +413,28 @@ function HoldingRow({
         </Pill>
       </div>
 
-      <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:w-44 md:opacity-0 md:group-hover:opacity-100">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500"
-          onClick={(e) => {
-            e.stopPropagation()
-            onTrade('buy')
-          }}
-        >
-          Buy
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-rose-500 hover:bg-rose-500/10 hover:text-rose-500"
-          onClick={(e) => {
-            e.stopPropagation()
-            onTrade('sell')
-          }}
-        >
-          Sell
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          title={`Edit ${h.symbol} position`}
-          aria-label={`Edit ${h.symbol} position`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit()
-          }}
-        >
-          <Pencil className="size-3.5" />
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="hover:bg-rose-500/10 hover:text-rose-500"
-          title={`Delete ${h.symbol}`}
-          aria-label={`Delete ${h.symbol}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
+      <div className="hidden xl:block">
+        <div className="text-right font-mono text-sm tabular">{weight.toFixed(1)}%</div>
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-subtle">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: color }}
+            initial={{ width: 0 }}
+            animate={{ width: `${weight}%` }}
+            transition={{ delay: 0.2 + index * 0.05, type: 'spring', stiffness: 80, damping: 18 }}
+          />
+        </div>
       </div>
+
+      <Menu
+        label={`Actions for ${h.symbol}`}
+        items={[
+          { label: `Buy ${h.symbol}`, icon: <Plus />, tone: 'success', onSelect: () => onTrade('buy') },
+          { label: `Sell ${h.symbol}`, icon: <Minus />, onSelect: () => onTrade('sell') },
+          { label: 'Edit position', icon: <Pencil />, onSelect: onEdit },
+          { label: 'Delete stock', icon: <Trash2 />, tone: 'danger', onSelect: onDelete },
+        ]}
+      />
     </motion.div>
   )
 }
@@ -498,7 +488,7 @@ function TradeList({ trades, onEdit }: { trades: Trade[]; onEdit: (t: Trade) => 
               </div>
               <button
                 onClick={() => onEdit(t)}
-                className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted opacity-0 transition group-hover:opacity-100 hover:bg-elevated hover:text-fg max-sm:opacity-100"
+                className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted opacity-40 transition group-hover:opacity-100 hover:bg-elevated hover:text-fg max-sm:opacity-100"
                 aria-label="Edit trade"
               >
                 <Pencil className="size-4" />
@@ -515,7 +505,7 @@ function TradeList({ trades, onEdit }: { trades: Trade[]; onEdit: (t: Trade) => 
                   await remove.mutateAsync(t.id)
                   toast({ message: 'Trade deleted', tone: 'info' })
                 }}
-                className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-500 max-sm:opacity-100"
+                className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted opacity-40 transition group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-500 max-sm:opacity-100"
                 aria-label="Delete trade"
               >
                 <Trash2 className="size-4" />
