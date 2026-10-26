@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
-import { CandlestickChart, Clock, Minus, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
+import { CandlestickChart, Clock, Minus, Pencil, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, WifiOff } from 'lucide-react'
 import { LOT_SIZE, type Holding, type Trade, type TradeSide } from '@shared/types'
-import { refreshPortfolio, useBootstrap, useDeleteTrade, usePortfolio, useTrades } from '@/lib/api'
+import { refreshPortfolio, useBootstrap, useDeletePosition, useDeleteTrade, usePortfolio, useTrades } from '@/lib/api'
 import { friendlyDate, useIdr } from '@/lib/format'
 import { cn, palette } from '@/lib/utils'
 import { PageHeader } from '@/components/Layout'
@@ -16,6 +16,7 @@ import { EmptyState, Skeleton } from '@/components/ui/Misc'
 import { useConfirm } from '@/components/ui/Confirm'
 import { useToast } from '@/components/ui/Toast'
 import { TradeModal } from '@/components/TradeForm'
+import { PositionModal, replacementWarning } from '@/components/PositionForm'
 import { Sparkline } from '@/components/charts/Sparkline'
 import { MarketStrip } from '@/components/MarketStrip'
 
@@ -41,6 +42,33 @@ export function Stocks() {
   const [refreshing, setRefreshing] = useState(false)
   const [trade, setTrade] = useState<{ side: TradeSide; symbol?: string } | null>(null)
   const [filter, setFilter] = useState<string | null>(null)
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null)
+  const [editingPosition, setEditingPosition] = useState<Holding | null>(null)
+  const confirm = useConfirm()
+  const deletePosition = useDeletePosition()
+
+  const removeHolding = async (h: Holding) => {
+    const related = trades.filter((t) => t.symbol === h.symbol)
+    const ok = await confirm({
+      title: `Delete ${h.symbol}?`,
+      message: [
+        `This removes ${h.symbol} and ${related.length === 1 ? 'its only trade' : `all ${related.length} of its trades`}. This cannot be undone.`,
+        replacementWarning(related, idr.signed),
+      ]
+        .filter(Boolean)
+        .join(' '),
+      confirmLabel: 'Delete stock',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deletePosition.mutateAsync(h.symbol)
+      if (filter === h.symbol) setFilter(null)
+      toast({ message: `${h.symbol} deleted`, tone: 'info' })
+    } catch (e) {
+      toast({ message: (e as Error).message, tone: 'error' })
+    }
+  }
 
   const holdings = portfolio?.holdings ?? []
   const totals = portfolio?.totals
@@ -180,7 +208,7 @@ export function Stocks() {
                   <span className="text-right">Price</span>
                   <span className="text-right">Value</span>
                   <span className="text-right">P/L</span>
-                  <span className="w-24" />
+                  <span className="w-44" />
                 </div>
                 {holdings.map((h, i) => (
                   <HoldingRow
@@ -191,6 +219,8 @@ export function Stocks() {
                     active={filter === h.symbol}
                     onSelect={() => setFilter((f) => (f === h.symbol ? null : h.symbol))}
                     onTrade={(side) => setTrade({ side, symbol: h.symbol })}
+                    onEdit={() => setEditingPosition(h)}
+                    onDelete={() => removeHolding(h)}
                   />
                 ))}
               </div>
@@ -211,7 +241,7 @@ export function Stocks() {
                 )
               }
             />
-            <TradeList trades={visibleTrades} />
+            <TradeList trades={visibleTrades} onEdit={setEditingTrade} />
           </Card>
         </div>
       )}
@@ -222,6 +252,18 @@ export function Stocks() {
         symbol={trade?.symbol}
         holdings={holdings}
         onClose={() => setTrade(null)}
+      />
+      <TradeModal
+        open={!!editingTrade}
+        side={editingTrade?.side ?? 'buy'}
+        trade={editingTrade ?? undefined}
+        holdings={holdings}
+        onClose={() => setEditingTrade(null)}
+      />
+      <PositionModal
+        holding={editingPosition}
+        trades={editingPosition ? trades.filter((t) => t.symbol === editingPosition.symbol) : []}
+        onClose={() => setEditingPosition(null)}
       />
     </div>
   )
@@ -289,6 +331,8 @@ function HoldingRow({
   active,
   onSelect,
   onTrade,
+  onEdit,
+  onDelete,
 }: {
   holding: Holding
   color: string
@@ -296,6 +340,8 @@ function HoldingRow({
   active: boolean
   onSelect: () => void
   onTrade: (side: TradeSide) => void
+  onEdit: () => void
+  onDelete: () => void
 }) {
   const idr = useIdr()
   return (
@@ -350,7 +396,7 @@ function HoldingRow({
         </Pill>
       </div>
 
-      <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:w-24 md:opacity-0 md:group-hover:opacity-100">
+      <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:w-44 md:opacity-0 md:group-hover:opacity-100">
         <Button
           size="sm"
           variant="ghost"
@@ -373,12 +419,37 @@ function HoldingRow({
         >
           Sell
         </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          title={`Edit ${h.symbol} position`}
+          aria-label={`Edit ${h.symbol} position`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit()
+          }}
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="hover:bg-rose-500/10 hover:text-rose-500"
+          title={`Delete ${h.symbol}`}
+          aria-label={`Delete ${h.symbol}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
       </div>
     </motion.div>
   )
 }
 
-function TradeList({ trades }: { trades: Trade[] }) {
+function TradeList({ trades, onEdit }: { trades: Trade[]; onEdit: (t: Trade) => void }) {
   const idr = useIdr()
   const { data: boot } = useBootstrap()
   const confirm = useConfirm()
@@ -426,9 +497,16 @@ function TradeList({ trades }: { trades: Trade[] }) {
                 {idr.format(total)}
               </div>
               <button
+                onClick={() => onEdit(t)}
+                className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted opacity-0 transition group-hover:opacity-100 hover:bg-elevated hover:text-fg max-sm:opacity-100"
+                aria-label="Edit trade"
+              >
+                <Pencil className="size-4" />
+              </button>
+              <button
                 onClick={async () => {
                   const ok = await confirm({
-                    title: 'Delete this trade?',
+                    title: `Delete this ${t.symbol} trade?`,
                     message: 'Holdings, average price and the linked cash balance will be recalculated.',
                     confirmLabel: 'Delete',
                     danger: true,

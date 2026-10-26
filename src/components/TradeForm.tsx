@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Loader2, SearchX } from 'lucide-react'
-import { LOT_SIZE, type Holding, type TradeSide } from '@shared/types'
+import { LOT_SIZE, type Holding, type Trade, type TradeSide } from '@shared/types'
 import { useBootstrap, useQuote, useSaveTrade } from '@/lib/api'
 import { useAmountInput } from '@/lib/amount'
 import { toISODate, useIdr } from '@/lib/format'
@@ -10,6 +10,7 @@ import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
 import { Field, Input, Segmented, Select } from './ui/Form'
 import { useToast } from './ui/Toast'
+import { useConfirm } from './ui/Confirm'
 
 const feeRates: Record<TradeSide, number> = { buy: 0.0015, sell: 0.0025 }
 
@@ -27,17 +28,33 @@ export function TradeModal({
   side,
   symbol,
   holdings,
+  trade,
   onClose,
 }: {
   open: boolean
   side: TradeSide
   symbol?: string
   holdings: Holding[]
+  trade?: Trade
   onClose: () => void
 }) {
   return (
-    <Modal open={open} onClose={onClose} title="Record trade" description="Prices are per share · 1 lot = 100 shares">
-      {open && <TradeForm key={`${side}-${symbol ?? ''}`} initialSide={side} initialSymbol={symbol} holdings={holdings} onClose={onClose} />}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={trade ? `Edit ${trade.symbol} trade` : 'Record trade'}
+      description="Prices are per share · 1 lot = 100 shares"
+    >
+      {open && (
+        <TradeForm
+          key={trade?.id ?? `${side}-${symbol ?? ''}`}
+          initialSide={trade?.side ?? side}
+          initialSymbol={trade?.symbol ?? symbol}
+          holdings={holdings}
+          editing={trade}
+          onClose={onClose}
+        />
+      )}
     </Modal>
   )
 }
@@ -46,15 +63,18 @@ function TradeForm({
   initialSide,
   initialSymbol,
   holdings,
+  editing,
   onClose,
 }: {
   initialSide: TradeSide
   initialSymbol?: string
   holdings: Holding[]
+  editing?: Trade
   onClose: () => void
 }) {
   const idr = useIdr()
   const toast = useToast()
+  const confirm = useConfirm()
   const save = useSaveTrade()
   const { data: boot } = useBootstrap()
   const accounts = boot?.accounts ?? []
@@ -62,14 +82,15 @@ function TradeForm({
 
   const [side, setSide] = useState<TradeSide>(initialSide)
   const [symbol, setSymbol] = useState(initialSymbol ?? (initialSide === 'sell' ? (holdings[0]?.symbol ?? '') : ''))
-  const [accountId, setAccountId] = useState(holdings.length ? defaultAccount : '')
-  const [date, setDate] = useState(toISODate(new Date()))
-  const [note, setNote] = useState('')
+  const [accountId, setAccountId] = useState(editing ? (editing.accountId ?? '') : holdings.length ? defaultAccount : '')
+  const [date, setDate] = useState(editing?.date ?? toISODate(new Date()))
+  const [note, setNote] = useState(editing?.note ?? '')
   const [error, setError] = useState<string | null>(null)
-  const [unit, setUnit] = useState<'lot' | 'share'>('lot')
-  const qty = useAmountInput()
-  const price = useAmountInput()
-  const fee = useAmountInput()
+  const editingWholeLots = !editing || Number.isInteger(Math.round(editing.lots * 1e6) / 1e6)
+  const [unit, setUnit] = useState<'lot' | 'share'>(editingWholeLots ? 'lot' : 'share')
+  const qty = useAmountInput(editing ? (editingWholeLots ? editing.lots : Math.round(editing.lots * LOT_SIZE)) : null)
+  const price = useAmountInput(editing?.price)
+  const fee = useAmountInput(editing?.fee || null)
 
   const lookup = useDebounced(symbol.trim().toUpperCase(), 400)
   const quote = useQuote(lookup)
@@ -79,12 +100,13 @@ function TradeForm({
   const quotedPrice = quote.data?.price
   const quotedSymbol = quote.data?.symbol
   useEffect(() => {
-    if (quotedPrice) setPrice(quotedPrice)
-  }, [quotedSymbol, quotedPrice, setPrice])
+    if (quotedPrice && !editing) setPrice(quotedPrice)
+  }, [quotedSymbol, quotedPrice, setPrice, editing])
 
   const shares = Math.round((qty.amount ?? 0) * (unit === 'lot' ? LOT_SIZE : 1) * 100) / 100
   const lots = shares / LOT_SIZE
-  const heldShares = holding ? Math.round(holding.lots * LOT_SIZE) : 0
+  const editingShares = editing ? Math.round(editing.lots * LOT_SIZE) * (editing.side === 'sell' ? 1 : -1) : 0
+  const heldShares = Math.max(0, (holding ? Math.round(holding.lots * LOT_SIZE) : 0) + editingShares)
   const gross = shares * (price.amount ?? 0)
   const feeValue = fee.amount ?? 0
   const total = side === 'buy' ? gross + feeValue : gross - feeValue
@@ -98,9 +120,18 @@ function TradeForm({
     if (!ticker) return setError('Enter a ticker')
     if (shares <= 0 || !Number.isInteger(shares)) return setError('Quantity must be a whole number of shares')
     if (!price.amount || price.amount <= 0) return setError('Enter a price per share')
-    if (side === 'sell' && holding && shares > heldShares) return setError(`You only hold ${idr.number(heldShares)} shares`)
+    if (side === 'sell' && shares > heldShares) return setError(`You only hold ${idr.number(heldShares)} shares`)
+    if (editing) {
+      const ok = await confirm({
+        title: `Save changes to this ${ticker} trade?`,
+        message: 'Holdings, average price, P/L and any linked cash balance will be recalculated.',
+        confirmLabel: 'Save changes',
+      })
+      if (!ok) return
+    }
     try {
       await save.mutateAsync({
+        id: editing?.id,
         symbol: ticker,
         side,
         lots,
@@ -110,7 +141,8 @@ function TradeForm({
         note: note.trim(),
         date,
       })
-      toast({ message: `${side === 'buy' ? 'Bought' : 'Sold'} ${Number.isInteger(lots) ? `${lots} lot` : `${idr.number(shares)} shares`} ${ticker}` })
+      const qtyLabel = Number.isInteger(lots) ? `${lots} lot` : `${idr.number(shares)} shares`
+      toast({ message: editing ? 'Trade updated' : `${side === 'buy' ? 'Bought' : 'Sold'} ${qtyLabel} ${ticker}` })
       onClose()
     } catch (e) {
       setError((e as Error).message)
@@ -129,7 +161,7 @@ function TradeForm({
         value={side}
         onChange={(s) => {
           setSide(s)
-          if (s === 'sell' && !sellOptions.includes(symbol)) setSymbol(sellOptions[0] ?? '')
+          if (!editing && s === 'sell' && !sellOptions.includes(symbol)) setSymbol(sellOptions[0] ?? '')
         }}
         className="flex w-full"
         options={[
@@ -144,7 +176,9 @@ function TradeForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Ticker">
-          {side === 'sell' ? (
+          {editing ? (
+            <Input value={symbol} readOnly className="font-mono opacity-70" />
+          ) : side === 'sell' ? (
             <Select value={symbol} onChange={(e) => setSymbol(e.target.value)}>
               {sellOptions.map((s) => (
                 <option key={s} value={s}>
@@ -229,13 +263,13 @@ function TradeForm({
           <Input {...qty.inputProps} autoFocus={!!initialSymbol} placeholder={unit === 'lot' ? '1' : '100'} />
           <div className="mt-1 flex min-h-4 items-center justify-between text-[11px] text-muted">
             <span>{shares > 0 && (unit === 'lot' ? `${idr.number(shares)} shares` : `${idr.number(lots)} lot`)}</span>
-            {side === 'sell' && holding && (
+            {side === 'sell' && heldShares > 0 && (
               <button
                 type="button"
                 onClick={() => qty.setAmount(unit === 'lot' ? heldShares / LOT_SIZE : heldShares)}
                 className="cursor-pointer text-violet-500 hover:underline"
               >
-                Max {unit === 'lot' ? `${idr.number(holding.lots)} lot` : `${idr.number(heldShares)} shares`}
+                Max {unit === 'lot' ? `${idr.number(heldShares / LOT_SIZE)} lot` : `${idr.number(heldShares)} shares`}
               </button>
             )}
           </div>
@@ -303,9 +337,9 @@ function TradeForm({
         variant={side === 'buy' ? 'primary' : 'danger'}
         className="w-full"
         loading={save.isPending}
-        disabled={side === 'sell' && !holdings.length}
+        disabled={side === 'sell' && !editing && !holdings.length}
       >
-        {side === 'buy' ? 'Record buy' : 'Record sell'}
+        {editing ? 'Save changes' : side === 'buy' ? 'Record buy' : 'Record sell'}
       </Button>
     </form>
   )

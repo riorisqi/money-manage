@@ -183,7 +183,18 @@ export function useTrades() {
   return useQuery({ queryKey: ['trades'], queryFn: () => request<Trade[]>('/trades') })
 }
 
-export const useSaveTrade = () => useInvalidating((data: TradeInput) => send<Trade>('POST', '/trades', data))
+export const useSaveTrade = () =>
+  useInvalidating(({ id, ...data }: TradeInput & { id?: string }) =>
+    id ? send<Trade>('PUT', `/trades/${id}`, data) : send<Trade>('POST', '/trades', data),
+  )
+
+export const useSetPosition = () =>
+  useInvalidating(({ symbol, ...data }: { symbol: string; lots: number; avgPrice: number; date: string }) =>
+    send<Trade>('PUT', `/holdings/${encodeURIComponent(symbol)}`, data),
+  )
+
+export const useDeletePosition = () =>
+  useInvalidating((symbol: string) => send<{ deleted: number }>('DELETE', `/holdings/${encodeURIComponent(symbol)}`))
 
 export const useDeleteTrade = () => useInvalidating((id: string) => send<void>('DELETE', `/trades/${id}`))
 

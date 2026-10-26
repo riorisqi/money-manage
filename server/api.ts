@@ -3,7 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { all, get, run, seed, transaction, uid } from './db'
 import { getMarket } from './market'
-import { buildPortfolio, computePositions, getQuote, listTrades, UnknownSymbolError } from './stocks'
+import { buildPortfolio, getQuote, listTrades, UnknownSymbolError } from './stocks'
 import type {
   Account,
   Backup,
@@ -427,21 +427,42 @@ api.get('/stocks/:symbol', async (c) => {
 
 api.get('/trades', (c) => c.json(listTrades(c.req.query('symbol')?.toUpperCase())))
 
-api.post('/trades', async (c) => {
-  const body = await parse(c, tradeSchema)
+function symbolParam(c: Context) {
+  const symbol = symbolSchema.safeParse(c.req.param('symbol'))
+  if (!symbol.success) throw new HTTPException(400, { message: symbol.error.issues[0].message })
+  return symbol.data
+}
+
+const positionSchema = z.object({
+  lots: tradeSchema.shape.lots,
+  avgPrice: money.positive().max(1e9),
+  date: dateStr,
+})
+
+async function validateTrade(body: z.infer<typeof tradeSchema>, excludeId?: string) {
   if (body.accountId) assertAccount(body.accountId)
-  if (body.side === 'sell') {
-    const held = computePositions(listTrades(body.symbol)).get(body.symbol)?.shares ?? 0
-    if (body.lots * LOT_SIZE > held + 1e-9) {
-      throw new HTTPException(400, { message: `You only hold ${held / LOT_SIZE} lot(s) of ${body.symbol}` })
-    }
-  } else {
+  const others = listTrades(body.symbol).filter((t) => t.id !== excludeId)
+  const sharesOf = (t: Pick<Trade, 'side' | 'lots'>) => (t.side === 'buy' ? 1 : -1) * t.lots * LOT_SIZE
+  const held = others.reduce((s, t) => s + sharesOf(t), 0)
+  if (held + sharesOf(body) < -1e-6) {
+    const message =
+      body.side === 'sell'
+        ? `You only hold ${held} shares of ${body.symbol}`
+        : `This would leave more ${body.symbol} sold than bought`
+    throw new HTTPException(400, { message })
+  }
+  if (body.side === 'buy' && !others.length) {
     try {
       await getQuote(body.symbol)
     } catch (err) {
       if (err instanceof UnknownSymbolError) throw new HTTPException(400, { message: `Unknown ticker ${body.symbol}` })
     }
   }
+}
+
+api.post('/trades', async (c) => {
+  const body = await parse(c, tradeSchema)
+  await validateTrade(body)
   const id = uid()
   run(
     `INSERT INTO trades (id, symbol, side, lots, price, fee, accountId, note, date, createdAt)
@@ -451,10 +472,48 @@ api.post('/trades', async (c) => {
   return c.json(get<Trade>('SELECT * FROM trades WHERE id = :id', { id }), 201)
 })
 
+api.put('/trades/:id', async (c) => {
+  const id = c.req.param('id')
+  const current = get<Trade>('SELECT * FROM trades WHERE id = :id', { id })
+  if (!current) notFound('Trade')
+  const body = await parse(c, tradeSchema)
+  if (body.symbol !== current.symbol) throw new HTTPException(400, { message: 'The ticker of a trade cannot be changed' })
+  await validateTrade(body, id)
+  run(
+    `UPDATE trades SET side = :side, lots = :lots, price = :price, fee = :fee, accountId = :accountId,
+     note = :note, date = :date WHERE id = :id`,
+    { id, ...body, accountId: body.accountId ?? null },
+  )
+  return c.json(get<Trade>('SELECT * FROM trades WHERE id = :id', { id }))
+})
+
 api.delete('/trades/:id', (c) => {
   const res = run('DELETE FROM trades WHERE id = :id', { id: c.req.param('id') })
   if (!res.changes) notFound('Trade')
   return c.body(null, 204)
+})
+
+api.put('/holdings/:symbol', async (c) => {
+  const symbol = symbolParam(c)
+  const body = await parse(c, positionSchema)
+  if (!listTrades(symbol).length) notFound(`Holding ${symbol}`)
+  const id = uid()
+  transaction(() => {
+    run('DELETE FROM trades WHERE symbol = :symbol', { symbol })
+    run(
+      `INSERT INTO trades (id, symbol, side, lots, price, fee, accountId, note, date, createdAt)
+       VALUES (:id, :symbol, 'buy', :lots, :price, 0, NULL, 'Position adjusted', :date, :createdAt)`,
+      { id, symbol, lots: body.lots, price: body.avgPrice, date: body.date, createdAt: new Date().toISOString() },
+    )
+  })
+  return c.json(get<Trade>('SELECT * FROM trades WHERE id = :id', { id }))
+})
+
+api.delete('/holdings/:symbol', (c) => {
+  const symbol = symbolParam(c)
+  const res = run('DELETE FROM trades WHERE symbol = :symbol', { symbol })
+  if (!res.changes) notFound(`Holding ${symbol}`)
+  return c.json({ deleted: res.changes })
 })
 
 api.get('/notes', (c) => c.json(listNotes()))
