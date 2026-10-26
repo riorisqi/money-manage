@@ -36,6 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: init?.body ? { 'Content-Type': 'application/json', ...init.headers } : init?.headers,
   })
+  if (res.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('auth:expired'))
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     throw new Error(data.error ?? `Request failed (${res.status})`)
@@ -50,6 +51,48 @@ export const toQuery = (params: object) => {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
   return entries.length ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)]))}` : ''
 }
+
+export interface AuthStatus {
+  configured: boolean
+  authenticated: boolean
+}
+
+export interface BackupList {
+  directory: string
+  keep: number
+  items: { name: string; size: number; createdAt: string }[]
+}
+
+export function useAuthStatus() {
+  return useQuery({ queryKey: ['auth'], queryFn: () => request<AuthStatus>('/auth/status'), staleTime: Infinity, retry: 1 })
+}
+
+function useAuthAction<TVars>(fn: (vars: TVars) => Promise<unknown>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: async () => {
+      await qc.resetQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
+      await qc.invalidateQueries({ queryKey: ['auth'] })
+    },
+  })
+}
+
+export const useLogin = () => useAuthAction((password: string) => send('POST', '/auth/login', { password }))
+export const useSetupPassword = () => useAuthAction((password: string) => send('POST', '/auth/setup', { password }))
+export const useLogout = () => useAuthAction(() => send('POST', '/auth/logout'))
+export const useChangePassword = () =>
+  useMutation({ mutationFn: (data: { current: string; next: string }) => send('POST', '/auth/change', data) })
+export const useLogoutOthers = () => useMutation({ mutationFn: () => send<{ signedOut: number }>('POST', '/auth/logout-others') })
+
+export function useBackups() {
+  return useQuery({ queryKey: ['backups'], queryFn: () => request<BackupList>('/backups') })
+}
+
+export const useCreateBackup = () => useInvalidating(() => send<{ name: string }>('POST', '/backups'))
+
+export const useRestoreSnapshot = () =>
+  useInvalidating((name: string) => send<void>('POST', `/backups/${encodeURIComponent(name)}/restore`))
 
 export function useBootstrap() {
   return useQuery({ queryKey: ['bootstrap'], queryFn: () => request<Bootstrap>('/bootstrap') })

@@ -13,6 +13,9 @@ A fast, good-looking personal finance tracker for recording income, expenses and
 - **Stocks (IDX)**: record buys and sells, auto-calculated lots, average price and realized/unrealized P/L, live prices (delayed ~15 min), allocation chart, 1-month sparklines, and portfolio value included in net worth
 - **Market**: live IHSG and rupiah rates (USD, SGD, EUR, JPY, CNY to IDR) with intraday charts and a live/closed indicator
 - **Notes**: pinned, color-coded notes with search and tickable checklists (`- [ ] item`)
+- **Security**: password/PIN lock screen, 30-day device sessions, brute-force lockout, sign out other devices
+- **Backups**: automatic daily SQLite snapshots (last 30 kept) with one-click restore
+- **Installable**: add to your phone's home screen as an app
 - **Settings**: currency and number format, JSON backup and restore, reset
 - **UX**: light, dark and system themes with a circular reveal transition, command palette (`Ctrl+K`), quick add (`N`), confetti on income, spring animations throughout, and a mobile layout with a bottom nav
 
@@ -43,6 +46,44 @@ Update after pulling new code:
 ```bash
 docker compose up -d --build
 ```
+
+## Access from your phone
+
+The app is only reachable from this computer by default (it binds to `127.0.0.1`). The safest way to use it from anywhere is [Tailscale](https://tailscale.com), a free private network between your own devices:
+
+1. Install Tailscale on the computer and on your phone, signed in to the same account.
+2. In the Tailscale admin console, enable **DNS → HTTPS Certificates**.
+3. On the computer, run:
+
+   ```bash
+   tailscale serve --bg 3000
+   ```
+
+4. Open the printed `https://<computer>.<tailnet>.ts.net` address on your phone, then use **Add to Home Screen** to install it.
+
+Do not forward port 3000 on your router. The computer must be awake with Docker Desktop running for the phone to connect.
+
+## Security
+
+On first launch you set a password or PIN. Devices stay signed in for 30 days, and repeated wrong attempts trigger an increasing lockout. Use **Settings → Security** to change the password, sign out other devices or lock the app.
+
+Forgot the password? This removes it (your data is kept) and signs every device out:
+
+```bash
+docker exec money-manage bun dist/server/index.js --reset-password
+```
+
+## Backups
+
+A snapshot of the database is saved every day to the `backups` folder next to `docker-compose.yml`, keeping the latest 30. Sync that folder to Google Drive or OneDrive for off-site copies. Backups can be downloaded or restored from **Settings → Automatic backups**; a safety snapshot is taken before every restore.
+
+| Variable      | Default        | Purpose                                     |
+| ------------- | -------------- | ------------------------------------------- |
+| `APP_PORT`    | `3000`         | Host port                                   |
+| `APP_BIND`    | `127.0.0.1`    | Host interface (`0.0.0.0` exposes it to your LAN) |
+| `BACKUP_PATH` | `./backups`    | Host folder for backups                     |
+| `BACKUP_KEEP` | `30`           | Number of backups to keep                   |
+| `TZ`          | `Asia/Jakarta` | Time zone used for backup names             |
 
 ## Local development
 

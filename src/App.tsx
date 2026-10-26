@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, ServerCrash } from 'lucide-react'
-import { useBootstrap } from './lib/api'
+import { useAuthStatus, useBootstrap } from './lib/api'
+import { LockScreen } from './components/LockScreen'
 import { Layout } from './components/Layout'
 import { Button } from './components/ui/Button'
 import { EmptyState } from './components/ui/Misc'
@@ -13,29 +16,49 @@ import { Notes } from './pages/Notes'
 import { Stocks } from './pages/Stocks'
 import { SettingsPage } from './pages/Settings'
 
+function Loading() {
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <Loader2 className="size-6 animate-spin text-violet-500" />
+    </div>
+  )
+}
+
+function Unreachable({ retry }: { retry: () => void }) {
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <EmptyState
+        icon={<ServerCrash className="size-6" />}
+        title="Can't reach the server"
+        message="Make sure the API is running, then try again."
+        action={<Button onClick={retry}>Retry</Button>}
+      />
+    </div>
+  )
+}
+
 export function App() {
-  const { isLoading, isError, refetch } = useBootstrap()
+  const qc = useQueryClient()
+  const { data: auth, isLoading, isError, refetch } = useAuthStatus()
 
-  if (isLoading) {
-    return (
-      <div className="grid min-h-dvh place-items-center">
-        <Loader2 className="size-6 animate-spin text-violet-500" />
-      </div>
-    )
-  }
+  useEffect(() => {
+    const onExpired = () => qc.invalidateQueries({ queryKey: ['auth'] })
+    window.addEventListener('auth:expired', onExpired)
+    return () => window.removeEventListener('auth:expired', onExpired)
+  }, [qc])
 
-  if (isError) {
-    return (
-      <div className="grid min-h-dvh place-items-center">
-        <EmptyState
-          icon={<ServerCrash className="size-6" />}
-          title="Can't reach the server"
-          message="Make sure the API is running, then try again."
-          action={<Button onClick={() => refetch()}>Retry</Button>}
-        />
-      </div>
-    )
-  }
+  if (isLoading) return <Loading />
+  if (isError || !auth) return <Unreachable retry={() => refetch()} />
+  if (!auth.configured) return <LockScreen mode="setup" />
+  if (!auth.authenticated) return <LockScreen mode="login" />
+  return <MainApp />
+}
+
+function MainApp() {
+  const { isLoading, isError, error, refetch } = useBootstrap()
+
+  if (isLoading || error?.message === 'Unauthorized') return <Loading />
+  if (isError) return <Unreachable retry={() => refetch()} />
 
   return (
     <Layout>

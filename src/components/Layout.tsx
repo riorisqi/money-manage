@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   CandlestickChart,
   Command,
+  Lock,
   LayoutDashboard,
   ListOrdered,
   Monitor,
@@ -17,6 +18,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useTheme, type ThemePref } from '@/lib/theme'
+import { useLogout } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Background } from './Background'
 import { CommandPalette } from './CommandPalette'
@@ -110,6 +112,21 @@ function QuickThemeToggle() {
   )
 }
 
+function LockButton() {
+  const logout = useLogout()
+  return (
+    <button
+      onClick={() => logout.mutate()}
+      disabled={logout.isPending}
+      className="grid w-11 cursor-pointer place-items-center rounded-xl border border-line bg-subtle text-muted transition hover:text-rose-500"
+      aria-label="Lock app"
+      title="Lock"
+    >
+      <Lock className="size-4" />
+    </button>
+  )
+}
+
 export function Layout({ children }: { children: (location: Location) => ReactNode }) {
   const { openTx } = useTxForm()
   const location = useLocation()
@@ -191,10 +208,13 @@ export function Layout({ children }: { children: (location: Location) => ReactNo
             <Kbd>K</Kbd>
           </span>
         </button>
-        <ThemeSwitch />
+        <div className="flex gap-2">
+          <ThemeSwitch className="flex-1" />
+          <LockButton />
+        </div>
       </aside>
 
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line bg-bg/70 px-4 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-30 box-content flex h-16 items-center pt-[env(safe-area-inset-top)] justify-between border-b border-line bg-bg/70 px-4 backdrop-blur-xl lg:hidden">
         <Logo />
         <div className="flex items-center gap-1.5">
           <button

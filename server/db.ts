@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-const dataDir = process.env.DATA_DIR ?? join(process.cwd(), 'data')
+export const dataDir = process.env.DATA_DIR ?? join(process.cwd(), 'data')
 mkdirSync(dataDir, { recursive: true })
 
 export const db = new Database(join(dataDir, 'money.db'), { create: true, strict: true })
@@ -85,6 +85,13 @@ db.exec(`
     currency TEXT NOT NULL,
     history TEXT NOT NULL,
     updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    userAgent TEXT NOT NULL DEFAULT '',
+    createdAt TEXT NOT NULL,
+    expiresAt TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS settings (

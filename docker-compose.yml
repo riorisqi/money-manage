@@ -7,9 +7,14 @@ services:
     container_name: money-manage
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+      BACKUP_DIR: /backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-30}
     volumes:
       - money-data:/data
+      - ${BACKUP_PATH:-./backups}:/backups
 
 volumes:
   money-data:

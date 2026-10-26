@@ -9,3 +9,4 @@ data
 !.vscode/extensions.json
 .idea
 .claude/settings.local.json
+backups

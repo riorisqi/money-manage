@@ -12,6 +12,7 @@ import { Field, Select } from '@/components/ui/Form'
 import { Kbd } from '@/components/ui/Misc'
 import { useToast } from '@/components/ui/Toast'
 import { useConfirm } from '@/components/ui/Confirm'
+import { BackupsCard, SecurityCard } from '@/components/SettingsCards'
 
 function Row({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -133,6 +134,9 @@ export function SettingsPage() {
             </Field>
           </div>
         </Card>
+
+        <SecurityCard />
+        <BackupsCard />
 
         <Card>
           <CardHeader title="Data" subtitle="Stored locally in SQLite on your machine" action={<Database className="size-4 text-muted" />} />

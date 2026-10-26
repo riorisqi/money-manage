@@ -4,15 +4,27 @@ import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { compress } from 'hono/compress'
 import { api } from './api'
+import { auth, requireAuth, resetPassword } from './auth'
+import { backups, startBackupSchedule } from './backups'
 import { db, seed } from './db'
 
+if (process.argv.includes('--reset-password')) {
+  resetPassword()
+  console.log('Password removed and all devices signed out. Open the app to set a new one.')
+  process.exit(0)
+}
+
 seed()
+startBackupSchedule()
 
 const app = new Hono()
 const clientRoot = process.env.CLIENT_DIR ?? './dist/client'
 
 app.use('/api/*', logger())
 app.use('*', compress())
+app.use('/api/*', requireAuth)
+app.route('/api/auth', auth)
+app.route('/api/backups', backups)
 app.route('/api', api)
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404))
 

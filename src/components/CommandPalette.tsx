@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   ArrowDownLeft,
+  Lock,
   CandlestickChart,
   ArrowLeftRight,
   ArrowUpRight,
@@ -20,6 +21,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
+import { useLogout } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useTxForm } from './TransactionForm'
 import { Kbd } from './ui/Misc'
@@ -37,6 +39,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigate = useNavigate()
   const { openTx } = useTxForm()
   const { resolved, setPref } = useTheme()
+  const logout = useLogout()
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -54,6 +57,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         keywords: 'theme appearance',
         run: () => setPref(resolved === 'dark' ? 'light' : 'dark'),
       },
+      { id: 'lock', group: 'Actions', label: 'Lock app', icon: <Lock />, keywords: 'logout sign out security', run: () => logout.mutate() },
       { id: 'dash', group: 'Navigate', label: 'Dashboard', icon: <LayoutDashboard />, keywords: 'home overview', run: () => navigate('/') },
       { id: 'tx', group: 'Navigate', label: 'Transactions', icon: <ListOrdered />, keywords: 'history list', run: () => navigate('/transactions') },
       { id: 'budgets', group: 'Navigate', label: 'Budgets', icon: <PiggyBank />, keywords: 'limit plan', run: () => navigate('/budgets') },
@@ -63,7 +67,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: 'notes', group: 'Navigate', label: 'Notes', icon: <NotebookPen />, keywords: 'memo todo checklist list', run: () => navigate('/notes') },
       { id: 'settings', group: 'Navigate', label: 'Settings', icon: <Settings />, keywords: 'currency backup export', run: () => navigate('/settings') },
     ],
-    [navigate, openTx, resolved, setPref],
+    [navigate, openTx, resolved, setPref, logout],
   )
 
   const results = useMemo(() => {
