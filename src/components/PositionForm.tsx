@@ -48,23 +48,28 @@ function PositionForm({ holding, trades, onClose }: { holding: Holding; trades: 
   const wholeLots = heldShares % LOT_SIZE === 0
   const [unit, setUnit] = useState<'lot' | 'share'>(wholeLots ? 'lot' : 'share')
   const qty = useAmountInput(wholeLots ? heldShares / LOT_SIZE : heldShares)
+  const roundAvg = Math.abs(holding.avgPrice * 100 - Math.round(holding.avgPrice * 100)) < 1e-6
+  const [priceMode, setPriceMode] = useState<'avg' | 'invested'>(roundAvg ? 'avg' : 'invested')
   const avg = useAmountInput(Math.round(holding.avgPrice * 100) / 100)
+  const invested = useAmountInput(Math.round(holding.cost * 100) / 100)
   const earliest = trades.map((t) => t.date).sort()[0]
   const [date, setDate] = useState(earliest ?? new Date().toISOString().slice(0, 10))
   const [error, setError] = useState<string | null>(null)
 
   const shares = Math.round((qty.amount ?? 0) * (unit === 'lot' ? LOT_SIZE : 1) * 100) / 100
+  const avgPrice = priceMode === 'avg' ? (avg.amount ?? 0) : shares > 0 ? (invested.amount ?? 0) / shares : 0
+  const costBasis = priceMode === 'avg' ? shares * (avg.amount ?? 0) : (invested.amount ?? 0)
   const warning = replacementWarning(trades, idr.signed)
   const hasSells = trades.some((t) => t.side === 'sell')
 
   const submit = async () => {
     setError(null)
     if (shares <= 0 || !Number.isInteger(shares)) return setError('Quantity must be a whole number of shares')
-    if (!avg.amount || avg.amount <= 0) return setError('Enter an average price')
+    if (avgPrice <= 0) return setError(priceMode === 'avg' ? 'Enter an average price' : 'Enter the invested amount')
     const ok = await confirm({
       title: `Replace ${holding.symbol} history?`,
       message: [
-        `${trades.length} trade${trades.length === 1 ? '' : 's'} will be replaced with one position of ${idr.number(shares)} shares at ${idr.format(avg.amount)}.`,
+        `${trades.length} trade${trades.length === 1 ? '' : 's'} will be replaced with one position of ${idr.number(shares)} shares, invested ${idr.format(costBasis)}.`,
         hasSells && 'Realized P/L from past sells will be cleared.',
         warning,
       ]
@@ -75,7 +80,7 @@ function PositionForm({ holding, trades, onClose }: { holding: Holding; trades: 
     })
     if (!ok) return
     try {
-      await save.mutateAsync({ symbol: holding.symbol, lots: shares / LOT_SIZE, avgPrice: avg.amount, date })
+      await save.mutateAsync({ symbol: holding.symbol, lots: shares / LOT_SIZE, avgPrice, date })
       toast({ message: `${holding.symbol} position updated` })
       onClose()
     } catch (e) {
@@ -121,8 +126,37 @@ function PositionForm({ holding, trades, onClose }: { holding: Holding; trades: 
             {shares > 0 && (unit === 'lot' ? `${idr.number(shares)} shares` : `${idr.number(shares / LOT_SIZE)} lot`)}
           </div>
         </Field>
-        <Field label="Average price">
-          <Input {...avg.inputProps} />
+        <Field
+          label={priceMode === 'avg' ? 'Average price' : 'Invested'}
+          hint={
+            <span className="flex gap-0.5 rounded-md bg-subtle p-0.5">
+              {(['avg', 'invested'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    if (m === priceMode) return
+                    if (m === 'invested') invested.setAmount(Math.round(costBasis * 100) / 100 || null)
+                    else avg.setAmount(avgPrice ? Math.round(avgPrice * 100) / 100 : null)
+                    setPriceMode(m)
+                  }}
+                  className={cn(
+                    'cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-medium transition',
+                    m === priceMode ? 'bg-elevated text-fg shadow-sm' : 'text-muted hover:text-fg',
+                  )}
+                >
+                  {m === 'avg' ? 'Avg price' : 'Invested'}
+                </button>
+              ))}
+            </span>
+          }
+        >
+          {priceMode === 'avg' ? <Input {...avg.inputProps} /> : <Input {...invested.inputProps} />}
+          <div className="mt-1 text-[11px] text-muted">
+            {priceMode === 'avg'
+              ? costBasis > 0 && `Invested ${idr.format(costBasis)}`
+              : avgPrice > 0 && `Avg ${idr.precise(avgPrice)} per share`}
+          </div>
         </Field>
       </div>
       <Field label="Position date">
@@ -132,7 +166,7 @@ function PositionForm({ holding, trades, onClose }: { holding: Holding; trades: 
       <div className="rounded-2xl border border-line bg-subtle p-4 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-muted">Cost basis</span>
-          <span className="font-display text-lg font-semibold tabular">{idr.format(shares * (avg.amount ?? 0))}</span>
+          <span className="font-display text-lg font-semibold tabular">{idr.format(costBasis)}</span>
         </div>
         <div className="mt-1 text-xs text-muted">
           Replaces {trades.length} trade{trades.length === 1 ? '' : 's'} with one entry. Cash balances are not affected by the new entry.

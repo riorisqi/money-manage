@@ -33,12 +33,22 @@ export function useIdr() {
     const full = new Intl.NumberFormat(locale, { style: 'currency', currency: 'IDR', maximumFractionDigits: 2, minimumFractionDigits: 0 })
     const compact = new Intl.NumberFormat(locale, { style: 'currency', currency: 'IDR', notation: 'compact', maximumFractionDigits: 1 })
     const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 })
+    const precise = new Intl.NumberFormat(locale, { maximumFractionDigits: 4 })
+    const truncated = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      roundingMode: 'trunc',
+    })
     return {
       format: (n: number) => full.format(n),
+      price: (n: number) => truncated.format(n),
       compact: (n: number) => (Math.abs(n) >= 1e9 ? compact.format(n) : full.format(n)),
       signed: (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${full.format(Math.abs(n))}`,
       short: (n: number) => `${n < 0 ? '−' : ''}${(Math.abs(n) >= 1e7 ? compact : full).format(Math.abs(n))}`,
       number: (n: number) => number.format(n),
+      precise: (n: number) => precise.format(n),
       pct: (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${number.format(Math.abs(n))}%`,
     }
   }, [locale])

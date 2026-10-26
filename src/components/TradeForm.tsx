@@ -323,7 +323,7 @@ function TradeForm({
         </div>
         {side === 'sell' && holding && shares > 0 && (
           <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-muted">Est. realized P/L (avg {idr.format(holding.avgPrice)})</span>
+            <span className="text-muted">Est. realized P/L (avg {idr.price(holding.avgPrice)})</span>
             <span className={cn('font-mono', realized >= 0 ? 'text-emerald-500' : 'text-rose-500')}>{idr.signed(realized)}</span>
           </div>
         )}

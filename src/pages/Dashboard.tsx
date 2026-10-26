@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { motion } from 'motion/react'
-import { differenceInCalendarDays, getDaysInMonth, parseISO } from 'date-fns'
+import { differenceInCalendarDays, format, getDaysInMonth, parseISO, subMonths } from 'date-fns'
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -46,14 +46,19 @@ const stagger = {
   show: { transition: { staggerChildren: 0.06 } },
 }
 
-function Delta({ value, invert }: { value: number; invert?: boolean }) {
+function Delta({ current, previous, label, invert }: { current: number; previous: number; label: string; invert?: boolean }) {
+  if (!previous) return null
+  const value = percentChange(current, previous)
   const good = invert ? value <= 0 : value >= 0
   const Icon = value >= 0 ? TrendingUp : TrendingDown
   return (
-    <Pill className={good ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}>
-      <Icon className="size-3" />
-      {Math.abs(value).toFixed(0)}%
-    </Pill>
+    <span className="flex items-center gap-1.5" title={`Compared with ${label}`}>
+      <Pill className={good ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}>
+        <Icon className="size-3" />
+        {Math.abs(value).toFixed(0)}%
+      </Pill>
+      <span className="text-[10px] text-muted">vs {label}</span>
+    </span>
   )
 }
 
@@ -70,6 +75,7 @@ export function Dashboard() {
 
   const accounts = boot?.accounts ?? []
   const stocksValue = useStocksValue()
+  const previousLabel = period.mode === 'month' ? format(subMonths(period.anchor, 1), 'MMM') : String(period.anchor.getFullYear() - 1)
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0) + stocksValue
   const income = stats?.income ?? 0
   const expense = stats?.expense ?? 0
@@ -154,14 +160,14 @@ export function Dashboard() {
       value: income,
       icon: <ArrowDownLeft className="size-4" />,
       tone: 'text-emerald-500 bg-emerald-500/10',
-      delta: <Delta value={percentChange(income, stats?.previous.income ?? 0)} />,
+      delta: <Delta current={income} previous={stats?.previous.income ?? 0} label={previousLabel} />,
     },
     {
       label: 'Expenses',
       value: expense,
       icon: <ArrowUpRight className="size-4" />,
       tone: 'text-rose-500 bg-rose-500/10',
-      delta: <Delta value={percentChange(expense, stats?.previous.expense ?? 0)} invert />,
+      delta: <Delta current={expense} previous={stats?.previous.expense ?? 0} label={previousLabel} invert />,
     },
   ]
 

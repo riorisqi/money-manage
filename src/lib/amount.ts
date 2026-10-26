@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from 'react'
 import { evaluateAmount } from './utils'
 import { useMoney } from './format'
 
@@ -42,6 +42,24 @@ function amountToText(n: number | null | undefined, seps: Separators) {
   return n ? formatAmountText(String(n).replace('.', seps.decimal), seps) : ''
 }
 
+function normalizeInsert(inserted: string, before: string, seps: Separators) {
+  if (!/[.,]/.test(inserted)) return inserted
+  const english = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(inserted)
+  const european = /^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(inserted)
+  if (english || european) {
+    const [int, frac] = english ? inserted.replace(/,/g, '').split('.') : inserted.replace(/\./g, '').split(',')
+    return frac ? `${int}${seps.decimal}${frac}` : int
+  }
+  if (!inserted.includes(seps.group)) return inserted
+  if (inserted === seps.group) {
+    const token = before.split(/[+\-*/x()]/).pop() ?? ''
+    return token.includes(seps.decimal) || !/\d$/.test(token) ? '' : seps.decimal
+  }
+  const parts = inserted.split(seps.group)
+  if (parts.length === 2 && !inserted.includes(seps.decimal) && /^\d{1,2}(?!\d)/.test(parts[1])) return parts.join(seps.decimal)
+  return inserted
+}
+
 export function useAmountInput(initial?: number | null) {
   const { locale } = useMoney()
   const seps = useMemo(() => getSeparators(locale), [locale])
@@ -55,36 +73,7 @@ export function useAmountInput(initial?: number | null) {
     caret.current = null
   }, [text])
 
-  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value
-    let pos = e.target.selectionStart ?? raw.length
-    const native = e.nativeEvent as InputEvent
-    const inserted = native.data ?? ''
-    const start = pos - inserted.length
-    if (inserted && start >= 0 && raw.slice(start, pos) === inserted && inserted.includes(seps.group)) {
-      let replacement = inserted
-      if (inserted === seps.group) {
-        const token = raw.slice(0, start).split(/[+\-*/x()]/).pop() ?? ''
-        replacement = token.includes(seps.decimal) || !/\d$/.test(token) ? '' : seps.decimal
-      } else {
-        const parts = inserted.split(seps.group)
-        if (parts.length === 2 && !inserted.includes(seps.decimal) && /^\d{1,2}(?!\d)/.test(parts[1])) {
-          replacement = parts.join(seps.decimal)
-        }
-      }
-      raw = raw.slice(0, start) + replacement + raw.slice(pos)
-      pos = start + replacement.length
-    }
-    const removedSeparatorOnly =
-      native.inputType === 'deleteContentBackward' && strip(raw, seps) === strip(text, seps)
-    if (removedSeparatorOnly) {
-      let i = pos - 1
-      while (i >= 0 && isGroupChar(raw[i], seps)) i--
-      if (i >= 0) {
-        raw = raw.slice(0, i) + raw.slice(i + 1)
-        pos = i
-      }
-    }
+  const commit = (raw: string, pos: number) => {
     const significant = strip(raw.slice(0, pos), seps).length
     const next = formatAmountText(raw, seps)
     let nextPos = 0
@@ -95,6 +84,39 @@ export function useAmountInput(initial?: number | null) {
     setText(next)
   }
 
+  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value
+    let pos = e.target.selectionStart ?? raw.length
+    const native = e.nativeEvent as InputEvent
+    const inserted = native.data ?? ''
+    const start = pos - inserted.length
+    if (inserted && start >= 0 && raw.slice(start, pos) === inserted) {
+      const replacement = normalizeInsert(inserted, raw.slice(0, start), seps)
+      raw = raw.slice(0, start) + replacement + raw.slice(pos)
+      pos = start + replacement.length
+    }
+    if (native.inputType === 'deleteContentBackward' && strip(raw, seps) === strip(text, seps)) {
+      let i = pos - 1
+      while (i >= 0 && isGroupChar(raw[i], seps)) i--
+      if (i >= 0) {
+        raw = raw.slice(0, i) + raw.slice(i + 1)
+        pos = i
+      }
+    }
+    commit(raw, pos)
+  }
+
+  const onPaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text').trim()
+    if (!pasted) return
+    e.preventDefault()
+    const el = e.currentTarget
+    const from = el.selectionStart ?? el.value.length
+    const to = el.selectionEnd ?? from
+    const replacement = normalizeInsert(pasted.replace(/^Rp\s*/i, ''), el.value.slice(0, from), seps)
+    commit(el.value.slice(0, from) + replacement + el.value.slice(to), from + replacement.length)
+  }
+
   const setAmount = useCallback((n: number | null) => setText(amountToText(n, seps)), [seps])
 
   return {
@@ -102,6 +124,6 @@ export function useAmountInput(initial?: number | null) {
     amount: parseAmountText(text, seps),
     setAmount,
     ref,
-    inputProps: { ref, value: text, onChange, inputMode: 'decimal' as const, autoComplete: 'off' },
+    inputProps: { ref, value: text, onChange, onPaste, inputMode: 'decimal' as const, autoComplete: 'off' },
   }
 }

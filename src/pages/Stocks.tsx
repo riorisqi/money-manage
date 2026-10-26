@@ -375,7 +375,7 @@ function HoldingRow({
           <div className="truncate text-xs text-muted">{h.name}</div>
           <div className="text-[11px] text-muted tabular">
             {Number.isInteger(Math.round(h.lots * 1e6) / 1e6) ? `${idr.number(h.lots)} lot` : `${idr.number(Math.round(h.lots * LOT_SIZE))} shares`} · avg{' '}
-            {idr.format(h.avgPrice)}
+            {idr.price(h.avgPrice)}
           </div>
         </div>
       </div>
