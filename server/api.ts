@@ -77,7 +77,11 @@ const symbolSchema = z
 const tradeSchema = z.object({
   symbol: symbolSchema,
   side: z.enum(['buy', 'sell']),
-  lots: z.number().int('Lots must be a whole number').positive().max(1e9),
+  lots: z
+    .number()
+    .positive()
+    .max(1e9)
+    .refine((l) => Math.abs(l * LOT_SIZE - Math.round(l * LOT_SIZE)) < 1e-6, 'Quantity must be a whole number of shares'),
   price: money.positive().max(1e9),
   fee: money.min(0).max(1e12).default(0),
   accountId: z.string().nullish(),

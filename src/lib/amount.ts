@@ -58,8 +58,25 @@ export function useAmountInput(initial?: number | null) {
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value
     let pos = e.target.selectionStart ?? raw.length
+    const native = e.nativeEvent as InputEvent
+    const inserted = native.data ?? ''
+    const start = pos - inserted.length
+    if (inserted && start >= 0 && raw.slice(start, pos) === inserted && inserted.includes(seps.group)) {
+      let replacement = inserted
+      if (inserted === seps.group) {
+        const token = raw.slice(0, start).split(/[+\-*/x()]/).pop() ?? ''
+        replacement = token.includes(seps.decimal) || !/\d$/.test(token) ? '' : seps.decimal
+      } else {
+        const parts = inserted.split(seps.group)
+        if (parts.length === 2 && !inserted.includes(seps.decimal) && /^\d{1,2}(?!\d)/.test(parts[1])) {
+          replacement = parts.join(seps.decimal)
+        }
+      }
+      raw = raw.slice(0, start) + replacement + raw.slice(pos)
+      pos = start + replacement.length
+    }
     const removedSeparatorOnly =
-      (e.nativeEvent as InputEvent).inputType === 'deleteContentBackward' && strip(raw, seps) === strip(text, seps)
+      native.inputType === 'deleteContentBackward' && strip(raw, seps) === strip(text, seps)
     if (removedSeparatorOnly) {
       let i = pos - 1
       while (i >= 0 && isGroupChar(raw[i], seps)) i--

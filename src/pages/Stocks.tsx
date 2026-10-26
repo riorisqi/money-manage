@@ -174,13 +174,13 @@ export function Stocks() {
             <CardHeader title="Holdings" subtitle={`${holdings.length} open position${holdings.length === 1 ? '' : 's'} · 1 lot = ${LOT_SIZE} shares`} />
             {holdings.length ? (
               <div className="-mx-2">
-                <div className="hidden grid-cols-[minmax(0,2fr)_1fr_1fr_1.2fr_1.2fr_auto] gap-4 px-2 pb-2 text-[11px] font-medium tracking-wide text-muted uppercase md:grid">
+                <div className="hidden grid-cols-[minmax(0,2fr)_1fr_1.2fr_1.2fr_auto] gap-4 xl:grid-cols-[minmax(0,2fr)_1fr_1fr_1.2fr_1.2fr_auto] px-2 pb-2 text-[11px] font-medium tracking-wide text-muted uppercase md:grid">
                   <span>Stock</span>
-                  <span>Trend 1M</span>
+                  <span className="hidden xl:block">Trend 1M</span>
                   <span className="text-right">Price</span>
                   <span className="text-right">Value</span>
                   <span className="text-right">P/L</span>
-                  <span className="w-16" />
+                  <span className="w-24" />
                 </div>
                 {holdings.map((h, i) => (
                   <HoldingRow
@@ -305,7 +305,7 @@ function HoldingRow({
       transition={{ delay: index * 0.05 }}
       onClick={onSelect}
       className={cn(
-        'group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-xl px-2 py-3 transition hover:bg-subtle md:grid-cols-[minmax(0,2fr)_1fr_1fr_1.2fr_1.2fr_auto]',
+        'group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-xl px-2 py-3 transition hover:bg-subtle md:grid-cols-[minmax(0,2fr)_1fr_1.2fr_1.2fr_auto] xl:grid-cols-[minmax(0,2fr)_1fr_1fr_1.2fr_1.2fr_auto]',
         active && 'bg-subtle ring-1 ring-line',
       )}
     >
@@ -318,7 +318,8 @@ function HoldingRow({
           </div>
           <div className="truncate text-xs text-muted">{h.name}</div>
           <div className="text-[11px] text-muted tabular">
-            {idr.number(h.lots)} lot · avg {idr.format(h.avgPrice)}
+            {Number.isInteger(Math.round(h.lots * 1e6) / 1e6) ? `${idr.number(h.lots)} lot` : `${idr.number(Math.round(h.lots * LOT_SIZE))} shares`} · avg{' '}
+            {idr.format(h.avgPrice)}
           </div>
         </div>
       </div>
@@ -330,7 +331,7 @@ function HoldingRow({
         </div>
       </div>
 
-      <Sparkline data={h.history} className="hidden h-8 w-full md:block" />
+      <Sparkline data={h.history} className="hidden h-8 w-full xl:block" />
 
       <div className="hidden text-right md:block">
         <div className="font-mono text-sm tabular">{idr.format(h.price)}</div>
@@ -349,7 +350,7 @@ function HoldingRow({
         </Pill>
       </div>
 
-      <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:w-16 md:opacity-0 md:group-hover:opacity-100">
+      <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:w-24 md:opacity-0 md:group-hover:opacity-100">
         <Button
           size="sm"
           variant="ghost"
@@ -410,7 +411,8 @@ function TradeList({ trades }: { trades: Trade[] }) {
                   <span className="font-mono">{t.symbol}</span>
                   <span className="text-muted">
                     {' '}
-                    · {idr.number(t.lots)} lot @ {idr.format(t.price)}
+                    · {Number.isInteger(Math.round(t.lots * 1e6) / 1e6) ? `${idr.number(t.lots)} lot` : `${idr.number(Math.round(t.lots * LOT_SIZE))} shares`} @{' '}
+                    {idr.format(t.price)}
                   </span>
                 </div>
                 <div className="truncate text-xs text-muted">

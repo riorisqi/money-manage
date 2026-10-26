@@ -66,7 +66,8 @@ function TradeForm({
   const [date, setDate] = useState(toISODate(new Date()))
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const lots = useAmountInput()
+  const [unit, setUnit] = useState<'lot' | 'share'>('lot')
+  const qty = useAmountInput()
   const price = useAmountInput()
   const fee = useAmountInput()
 
@@ -81,7 +82,9 @@ function TradeForm({
     if (quotedPrice) setPrice(quotedPrice)
   }, [quotedSymbol, quotedPrice, setPrice])
 
-  const shares = (lots.amount ?? 0) * LOT_SIZE
+  const shares = Math.round((qty.amount ?? 0) * (unit === 'lot' ? LOT_SIZE : 1) * 100) / 100
+  const lots = shares / LOT_SIZE
+  const heldShares = holding ? Math.round(holding.lots * LOT_SIZE) : 0
   const gross = shares * (price.amount ?? 0)
   const feeValue = fee.amount ?? 0
   const total = side === 'buy' ? gross + feeValue : gross - feeValue
@@ -93,21 +96,21 @@ function TradeForm({
     setError(null)
     const ticker = symbol.trim().toUpperCase()
     if (!ticker) return setError('Enter a ticker')
-    if (!lots.amount || !Number.isInteger(lots.amount) || lots.amount <= 0) return setError('Lots must be a whole number')
+    if (shares <= 0 || !Number.isInteger(shares)) return setError('Quantity must be a whole number of shares')
     if (!price.amount || price.amount <= 0) return setError('Enter a price per share')
-    if (side === 'sell' && holding && lots.amount > holding.lots) return setError(`You only hold ${holding.lots} lot(s)`)
+    if (side === 'sell' && holding && shares > heldShares) return setError(`You only hold ${idr.number(heldShares)} shares`)
     try {
       await save.mutateAsync({
         symbol: ticker,
         side,
-        lots: lots.amount,
+        lots,
         price: price.amount,
         fee: feeValue,
         accountId: accountId || null,
         note: note.trim(),
         date,
       })
-      toast({ message: `${side === 'buy' ? 'Bought' : 'Sold'} ${lots.amount} lot ${ticker}` })
+      toast({ message: `${side === 'buy' ? 'Bought' : 'Sold'} ${Number.isInteger(lots) ? `${lots} lot` : `${idr.number(shares)} shares`} ${ticker}` })
       onClose()
     } catch (e) {
       setError((e as Error).message)
@@ -155,7 +158,7 @@ function TradeForm({
               value={symbol}
               onChange={(e) => setSymbol(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
               placeholder="e.g. BBCA"
-              className="font-mono uppercase"
+              className="font-mono uppercase placeholder:font-sans placeholder:normal-case"
             />
           )}
         </Field>
@@ -200,18 +203,42 @@ function TradeForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="Lots"
+          label="Quantity"
           hint={
-            side === 'sell' && holding ? (
-              <button type="button" onClick={() => lots.setAmount(holding.lots)} className="cursor-pointer text-violet-500 hover:underline">
-                Max {holding.lots}
-              </button>
-            ) : (
-              shares > 0 && `${idr.number(shares)} shares`
-            )
+            <span className="flex gap-0.5 rounded-md bg-subtle p-0.5">
+              {(['lot', 'share'] as const).map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => {
+                    if (u === unit) return
+                    setUnit(u)
+                    if (qty.amount) qty.setAmount(u === 'share' ? Math.round(qty.amount * LOT_SIZE) : qty.amount / LOT_SIZE)
+                  }}
+                  className={cn(
+                    'cursor-pointer rounded px-1.5 py-0.5 text-[11px] font-medium transition',
+                    u === unit ? 'bg-elevated text-fg shadow-sm' : 'text-muted hover:text-fg',
+                  )}
+                >
+                  {u === 'lot' ? 'Lot' : 'Shares'}
+                </button>
+              ))}
+            </span>
           }
         >
-          <Input {...lots.inputProps} autoFocus={!!initialSymbol} placeholder="1" />
+          <Input {...qty.inputProps} autoFocus={!!initialSymbol} placeholder={unit === 'lot' ? '1' : '100'} />
+          <div className="mt-1 flex min-h-4 items-center justify-between text-[11px] text-muted">
+            <span>{shares > 0 && (unit === 'lot' ? `${idr.number(shares)} shares` : `${idr.number(lots)} lot`)}</span>
+            {side === 'sell' && holding && (
+              <button
+                type="button"
+                onClick={() => qty.setAmount(unit === 'lot' ? heldShares / LOT_SIZE : heldShares)}
+                className="cursor-pointer text-violet-500 hover:underline"
+              >
+                Max {unit === 'lot' ? `${idr.number(holding.lots)} lot` : `${idr.number(heldShares)} shares`}
+              </button>
+            )}
+          </div>
         </Field>
         <Field label="Price per share">
           <Input {...price.inputProps} placeholder="0" />
