@@ -7,6 +7,7 @@ import { useAmountInput } from '@/lib/amount'
 import { toISODate, useIdr } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Modal } from './ui/Modal'
+import { DateInput } from './ui/DateInput'
 import { Button } from './ui/Button'
 import { Field, Input, Segmented, Select } from './ui/Form'
 import { useToast } from './ui/Toast'
@@ -297,7 +298,7 @@ function TradeForm({
           <Input {...fee.inputProps} placeholder="0" />
         </Field>
         <Field label="Date">
-          <Input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+          <DateInput value={date} onChange={setDate} />
         </Field>
       </div>
 

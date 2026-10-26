@@ -105,15 +105,6 @@ body {
   scrollbar-color: var(--line) transparent;
 }
 
-input[type='date']::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.6;
-}
-
-.dark input[type='date']::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
-
 @utility glass {
   background: var(--surface);
   backdrop-filter: blur(18px) saturate(1.4);

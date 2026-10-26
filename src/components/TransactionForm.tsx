@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { useAmountInput } from '@/lib/amount'
 import { IconBadge } from '@/lib/icons'
 import { Modal } from './ui/Modal'
+import { DateInput } from './ui/DateInput'
 import { Button } from './ui/Button'
 import { Field, Input, Segmented, Select } from './ui/Form'
 import { Kbd } from './ui/Misc'
@@ -310,7 +311,7 @@ function TransactionForm({ draft, onDone }: { draft: Draft; onDone: () => void }
             </span>
           }
         >
-          <Input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} required />
+          <DateInput value={date} onChange={setDate} />
         </Field>
         <Field label="Note">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was it for?" maxLength={500} />

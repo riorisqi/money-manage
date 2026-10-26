@@ -6,6 +6,7 @@ import { useAmountInput } from '@/lib/amount'
 import { useIdr } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Modal } from './ui/Modal'
+import { DateInput } from './ui/DateInput'
 import { Button } from './ui/Button'
 import { Field, Input } from './ui/Form'
 import { useConfirm } from './ui/Confirm'
@@ -160,7 +161,7 @@ function PositionForm({ holding, trades, onClose }: { holding: Holding; trades: 
         </Field>
       </div>
       <Field label="Position date">
-        <Input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+        <DateInput value={date} onChange={setDate} />
       </Field>
 
       <div className="rounded-2xl border border-line bg-subtle p-4 text-sm">
