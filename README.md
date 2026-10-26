@@ -28,7 +28,7 @@ docker compose up -d --build
 
 Open http://localhost:3000.
 
-The container uses `restart: unless-stopped`, so it starts automatically whenever Docker Desktop starts. To launch Docker Desktop at login, enable **Settings ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ General ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Start Docker Desktop when you sign in to your computer**.
+The container uses `restart: unless-stopped`, so it starts automatically whenever Docker Desktop starts. To launch Docker Desktop at login, enable **Settings → General → Start Docker Desktop when you sign in to your computer**.
 
 Data is stored in the `money-data` Docker volume and survives rebuilds and updates.
 
